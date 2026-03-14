@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from "react";
-import { runIngestionPipeline } from "../services/anthropicApi";
+// import { runIngestionPipeline } from "../services/anthropicApi";
+import { runIngestionPipeline } from "../services/ingestionService";
 import { useStore } from "../store/useStore";
 
 /**
@@ -54,7 +55,15 @@ export function useIngestion() {
     setLogs([]);
 
     try {
-      const { chunks } = await runIngestionPipeline(ingestion, files, addLog);
+      addLog("Starting ingestion pipeline...");
+
+      const { chunks } = await runIngestionPipeline(
+        ingestion,
+        files,
+        (msg, level="info") => addLog(msg, level)
+      );
+
+      addLog("Pipeline finished successfully", "success");
 
       setStats({
         chunks,

@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from pipeline.query.query_pipeline import run_query
-from pipeline.config.vector_store import DBType
+from src.pipeline.query.query_pipeline import run_query
+from src.pipeline.config.vector_store import DBType
 
 router = APIRouter()
 

@@ -1,7 +1,7 @@
 # pipeline.py
-from pipeline.ingestion.reader import Reader
-from pipeline.ingestion.chunking import Chunking
-from pipeline.config.vector_store import VectorDBFactory, DBType
+from src.pipeline.ingestion.reader import Reader
+from src.pipeline.ingestion.chunking import Chunking
+from src.pipeline.config.vector_store import VectorDBFactory, DBType
 
 
 

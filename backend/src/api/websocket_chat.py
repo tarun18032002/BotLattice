@@ -1,6 +1,6 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from pipeline.query.query_pipeline import run_query
-from pipeline.config.vector_store import DBType
+from src.pipeline.query.query_pipeline import run_query
+from src.pipeline.config.vector_store import DBType
 import json
 import asyncio
 

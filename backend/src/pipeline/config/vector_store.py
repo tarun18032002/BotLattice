@@ -1,11 +1,8 @@
 import os
-from enum import Enum
-from typing import Optional, Union
 
 # LlamaIndex Core
 from llama_index.core import StorageContext, VectorStoreIndex
 from llama_index.core.vector_stores.types import BasePydanticVectorStore
-from llama_index.core.retrievers import VectorIndexRetriever
 
 # Individual Vector Stores
 from llama_index.vector_stores.qdrant import QdrantVectorStore
@@ -17,23 +14,21 @@ import qdrant_client
 # from pinecone import Pinecone
 # import faiss
 
-class DBType(Enum):
-    QDRANT = "qdrant"
-    PINECONE = "pinecone"
-    FAISS = "faiss"
+from src.pipeline.config.enums import VectorDBType
+
 
 class VectorDBFactory:
     """Factory to create and manage connections to different Vector DBs."""
     
     @staticmethod
     def get_vector_store(
-        db_type: DBType, 
+        db_type: VectorDBType, 
         collection_name: str, 
         dim: int = 1536,
         **kwargs
     ) -> BasePydanticVectorStore:
         
-        if db_type == DBType.QDRANT:
+        if db_type == VectorDBType.QDRANT:
             # Expects QDRANT_URL and QDRANT_API_KEY in env
             print(f"The QDrant Url : {os.getenv("QDRANT_URL")}")
             client = qdrant_client.QdrantClient(
@@ -57,16 +52,18 @@ class VectorDBFactory:
         #     raise ValueError(f"Unsupported DB type: {db_type}")
 
     @classmethod
-    def create_index(cls, db_type: DBType, collection_name: str, nodes=None, dim=1536):
+    def create_index(cls, db_type: VectorDBType, collection_name: str, nodes=None, dim=1536):
         """Prepares a LlamaIndex VectorStoreIndex ready for query or ingestion."""
         vector_store = cls.get_vector_store(db_type, collection_name, dim=dim)
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
         
         if nodes:
             # Ingestion mode
+            print(f"----- ingest nodes,{len(nodes)}")
             return VectorStoreIndex(nodes, storage_context=storage_context)
         else:
             # Query mode (connect to existing)
+            print(f"----- query nodes")
             return VectorStoreIndex.from_vector_store(vector_store)
 
     

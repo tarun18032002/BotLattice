@@ -1,6 +1,6 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from src.pipeline.query.query_pipeline import run_query
-from src.pipeline.config.vector_store import DBType
+from src.pipeline.config.enums import VectorDBType
 import json
 import asyncio
 
@@ -26,7 +26,7 @@ async def websocket_chat(websocket: WebSocket):
                 run_query,
                 question,
                 collection_name=collection,
-                db_type=DBType.QDRANT
+                db_type=VectorDBType.QDRANT
             )
 
             await websocket.send_text(json.dumps({

@@ -1,48 +1,61 @@
-# pipeline/chunking.py
-
 from llama_index.core.node_parser import (
-    CodeSplitter,
-    HierarchicalNodeParser,
-    HTMLNodeParser,
     SentenceSplitter,
-    SimpleNodeParser
+    TokenTextSplitter,
+    CodeSplitter,
+    HTMLNodeParser,
+    HierarchicalNodeParser,
+    MarkdownNodeParser,
+    SimpleNodeParser,
 )
 
 
 class Chunking:
 
-    def __init__(self, chunking_type="sentence", chunk_size=512, chunk_overlap=50):
-        self.chunking_type = chunking_type
-        self.chunk_size = chunk_size
-        self.chunk_overlap = chunk_overlap
+    def __init__(self, chunking_request):
+        """
+        chunking_request : ChunkingRequest schema
+        """
+        self.config = chunking_request
+        self.chunking_type = chunking_request.chunking_type.value.lower()
 
     def get_splitter(self):
 
-        if self.chunking_type == "code":
-            return CodeSplitter(language="python", chunk_lines=self.chunk_size)
+        splitter_map = {
 
-        elif self.chunking_type == "hierarchical":
-            return HierarchicalNodeParser.from_defaults(
-                chunk_sizes=[self.chunk_size]
-            )
+            "sentence": lambda: SentenceSplitter(
+                chunk_size=self.config.chunk_size,
+                chunk_overlap=self.config.chunk_overlap
+            ),
 
-        elif self.chunking_type == "html":
-            return HTMLNodeParser()
+            "token": lambda: TokenTextSplitter(
+                chunk_size=self.config.chunk_size,
+                chunk_overlap=self.config.chunk_overlap
+            ),
 
-        elif self.chunking_type == "sentence":
-            return SentenceSplitter(
-                chunk_size=self.chunk_size,
-                chunk_overlap=self.chunk_overlap
-            )
+            "code": lambda: CodeSplitter(
+                language=self.config.language,
+                chunk_lines=self.config.chunk_lines,
+                chunk_lines_overlap=self.config.chunk_lines_overlap
+            ),
 
-        elif self.chunking_type == "simple":
-            return SimpleNodeParser.from_defaults(
-                chunk_size=self.chunk_size,
-                chunk_overlap=self.chunk_overlap
-            )
+            "html": lambda: HTMLNodeParser(),
 
-        else:
-            raise ValueError("Invalid chunking type")
+            "markdown": lambda: MarkdownNodeParser(),
+
+            "hierarchical": lambda: HierarchicalNodeParser.from_defaults(
+                chunk_sizes=self.config.chunk_sizes
+            ),
+
+            "simple": lambda: SimpleNodeParser.from_defaults(
+                chunk_size=self.config.chunk_size,
+                chunk_overlap=self.config.chunk_overlap
+            ),
+        }
+
+        if self.chunking_type not in splitter_map:
+            raise ValueError(f"Invalid chunking type: {self.chunking_type}")
+
+        return splitter_map[self.chunking_type]()
 
     def split(self, documents):
 

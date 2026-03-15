@@ -1,36 +1,62 @@
-# pipeline.py
+import json
 from src.pipeline.ingestion.reader import Reader
 from src.pipeline.ingestion.chunking import Chunking
-from src.pipeline.config.vector_store import VectorDBFactory, DBType
-
+from src.pipeline.config.vector_store import VectorDBFactory
+from src.pipeline.config.schemas import ChunkingRequest, EmbeddingRequest, VectorDBRequest
 
 
 def run_ingestion_pipeline(
-    file_path: str, 
-    db_type: DBType, 
-    collection_name: str,
-    chunk_size: int = 512
+    file_path: str,
+    chunking: ChunkingRequest,
+    embedding: EmbeddingRequest,
+    vectordb: VectorDBRequest
 ):
+
+    yield json.dumps({
+        "msg": f"--- Starting Ingestion for {file_path} ---",
+        "level": "info"
+    }) + "\n"
     print(f"--- Starting Ingestion for {file_path} ---")
 
-    # 1. Load Data
+    # 1️⃣ Load Data
     reader = Reader(file_path)
     documents = reader.load()
+
+    yield json.dumps({
+        "msg": f"Successfully loaded {len(documents)} document(s)",
+        "level": "info"
+    }) + "\n"
     print(f"Successfully loaded {len(documents)} document(s).")
 
-    # 2. Chunk Data
-    chunker = Chunking(chunking_type="sentence", chunk_size=chunk_size)
+    # 2️⃣ Chunk Data
+    chunker = Chunking(chunking_request=chunking)
     nodes = chunker.split(documents)
+
+    yield json.dumps({
+        "msg": f"Split documents into {len(nodes)} nodes",
+        "level": "info"
+    }) + "\n"
     print(f"Split documents into {len(nodes)} nodes.")
 
-    # 3. Connect to Vector DB & Ingest
-    # This step handles the embedding and storage automatically via LlamaIndex
+    # 3️⃣ Vector DB ingestion
+    db_type = vectordb.vectordb_type.value
+
+    yield json.dumps({
+        "msg": f"Connecting to Vector DB: {db_type}",
+        "level": "info"
+    }) + "\n"
+
     index = VectorDBFactory.create_index(
         db_type=db_type,
-        collection_name=collection_name,
+        collection_name=vectordb.collection_name,
         nodes=nodes,
-        dim=1536  # Adjust based on your embedding model
+        dim=1536
     )
 
-    print(f"--- Ingestion to {db_type.value} complete! ---")
+    yield json.dumps({
+        "msg": f"Ingestion to {db_type} completed successfully",
+        "level": "success"
+    }) + "\n"
+    print(f"--- Ingestion to {db_type} complete! ---")
+
     return index

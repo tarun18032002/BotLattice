@@ -22,13 +22,13 @@ export const DEFAULT_LLM_MODEL    = "claude-sonnet-4-20250514";
 // ── Chunking Strategies ────────────────────────────────────────────────────────
 
 export const CHUNK_STRATEGIES = [
-  { value: "fixed",     label: "Fixed Size",          desc: "Split by exact token count" },
-  { value: "recursive", label: "Recursive Character", desc: "Split by character hierarchy" },
-  { value: "sentence",  label: "Sentence Splitter",   desc: "Preserve sentence boundaries" },
-  { value: "semantic",  label: "Semantic Chunking",   desc: "Group by meaning similarity" },
-  { value: "token",     label: "Token-based",         desc: "Tiktoken or HF tokenizer" },
-  { value: "markdown",  label: "Markdown Header",     desc: "Split on # / ## headings" },
-  { value: "paragraph", label: "Paragraph",           desc: "Split on blank lines" },
+  { value: "sentence", label: "Sentence", desc: "Split by sentences" },
+  { value: "token", label: "Token", desc: "Token-based chunking" },
+  { value: "code", label: "Code", desc: "Code-aware splitting" },
+  { value: "html", label: "HTML", desc: "HTML structure parsing" },
+  { value: "markdown", label: "Markdown", desc: "Markdown parsing" },
+  { value: "hierarchical", label: "Hierarchical", desc: "Multi-level chunking" },
+  { value: "simple", label: "Simple", desc: "Basic chunking" },
 ];
 
 /** Returns which controls a strategy exposes */

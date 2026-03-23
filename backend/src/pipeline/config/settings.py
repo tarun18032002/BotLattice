@@ -33,4 +33,15 @@ Settings.llm = GoogleGenAI(
 # )
 
 
-Settings.embed_model = FastEmbedEmbedding(model_name="BAAI/bge-base-en-v1.5")
+Settings.embed_model = FastEmbedEmbedding(model_name="BAAI/bge-small-en-v1.5")
+
+
+from src.pipeline.config.schemas import VectorDBRequest,VectorDBType
+
+vectordb = VectorDBRequest(
+    vectordb_type=VectorDBType.QDRANT,
+    collection_name="resume",
+    url =os.getenv('QDRANT_URL'),
+    api_key = os.getenv('QDRANT_API_KEY')
+
+)

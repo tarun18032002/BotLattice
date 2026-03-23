@@ -16,7 +16,7 @@ class Chunking:
         chunking_request : ChunkingRequest schema
         """
         self.config = chunking_request
-        self.chunking_type = chunking_request.chunking_type.value.lower()
+        self.chunking_type = chunking_request.chunking_type.value
 
     def get_splitter(self):
 

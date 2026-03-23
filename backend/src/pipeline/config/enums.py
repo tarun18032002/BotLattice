@@ -21,3 +21,9 @@ class VectorDBType(str, Enum):
     QDRANT = "qdrant"
     chroma = "chroma"
     pinecone = "pinecone"
+
+
+class CollectionMode(str,Enum):
+    CREATE_NEW = "Create_new"
+    APPEND_TO_EXISTING ="Append_to_existing"
+    REPLACE_EXISTING = "Replace_existing"

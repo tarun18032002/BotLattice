@@ -3,10 +3,13 @@ from fastapi.responses import StreamingResponse
 import shutil
 import logging
 import json
+import os
 
+from src.pipeline.config  import settings
 from src.pipeline.ingestion.pipeline import run_ingestion_pipeline
 from src.logger.logging import StreamLogHandler
-from src.pipeline.config.schemas import IngestRequest
+from src.pipeline.config.schemas import ChunkingRequest,CollectionRequest
+
 
 router = APIRouter()
 
@@ -14,10 +17,18 @@ router = APIRouter()
 @router.post("/ingest")
 async def ingest_file(
     file: UploadFile = File(...),
-    config: str = Form(...)
-):
+    chunking: str = Form(...),
+    collection:str = Form(...),
 
-    config = IngestRequest.model_validate_json(config)
+):
+    try:
+        chunking_obj = ChunkingRequest.model_validate_json(chunking)
+        collection_obj = CollectionRequest.model_validate_json(collection)
+    except Exception as e:
+        # It's better to catch this early before entering the StreamingResponse
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail=f"Invalid JSON data: {str(e)}")
+
 
     async def log_stream():
 
@@ -31,7 +42,9 @@ async def ingest_file(
             "level": "info"
         }) + "\n"
 
-        file_location = f"temp/{file.filename}"
+        dir = 'temp'
+        os.makedirs(dir,exist_ok=True)
+        file_location = f"{dir}/{file.filename}"
 
         # Save uploaded file
         with open(file_location, "wb") as buffer:
@@ -45,9 +58,9 @@ async def ingest_file(
         # Run pipeline and stream logs
         for log in run_ingestion_pipeline(
             file_path=file_location,
-            chunking=config.chunking,
-            embedding=config.embedding,
-            vectordb=config.vectordb
+            chunking=chunking_obj,
+            collection= collection_obj
+
         ):
             yield log
 

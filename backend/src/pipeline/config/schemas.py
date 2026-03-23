@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from .enums import ChunkingType,EmbeddingProvider,VectorDBType
+from .enums import ChunkingType,EmbeddingProvider,VectorDBType,CollectionMode
 
 
 # -----------------------------
@@ -46,10 +46,20 @@ class VectorDBRequest(BaseModel):
 
     vectordb_type: VectorDBType = VectorDBType.QDRANT
 
-    collection_name: str = "documents"
+    # collection_name: str = "documents"
 
     url: Optional[str] = None
     api_key: Optional[str] = None
+
+# -----------------------------
+# Collection Request
+# -----------------------------
+
+class CollectionRequest(BaseModel):
+    mode: CollectionMode = CollectionMode.APPEND_TO_EXISTING
+    collection_name: str = "documents"
+    description: Optional[str] = None
+    tags: Optional[str] = None # Or List[str] if you split the string later
 
 
 # -----------------------------
@@ -63,3 +73,5 @@ class IngestRequest(BaseModel):
     embedding: EmbeddingRequest
 
     vectordb: VectorDBRequest
+
+

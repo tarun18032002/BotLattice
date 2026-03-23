@@ -1,52 +1,42 @@
-export async function runIngestionPipeline(apiConfig, files, log) {
-
+export async function runIngestionPipeline(chunking, collection, files, onMessage) {
   let totalChunks = 0;
 
   for (const file of files) {
-
     const formData = new FormData();
-
     formData.append("file", file);
-    formData.append("config", JSON.stringify(apiConfig));
+    formData.append("chunking", JSON.stringify(chunking));
+    formData.append("collection", JSON.stringify(collection));
 
-    const res = await fetch("http://localhost:8000/ingest", {
+    const response = await fetch("http://localhost:8000/ingest", {
       method: "POST",
       body: formData
     });
 
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Ingest failed (${response.status}): ${err}`);
+    }
 
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
     let buffer = "";
 
     while (true) {
-
       const { done, value } = await reader.read();
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
-
       const lines = buffer.split("\n");
       buffer = lines.pop();
 
       for (const line of lines) {
-
         if (!line.trim()) continue;
-
         try {
-
-          const data = JSON.parse(line);
-
-          if (data.msg) {
-            log(data.msg, data.level || "info");
-          }
-
-          if (data.done) {
-            totalChunks += data.chunks || 0;
-          }
-
+          const parsed = JSON.parse(line);
+          if (parsed.msg) onMessage(parsed.msg, parsed.level || "info");
+          if (parsed.done) totalChunks += parsed.chunks || 0;
         } catch (err) {
-          console.error("Invalid JSON stream chunk:", line);
+          console.warn("Stream parse error", err);
         }
       }
     }

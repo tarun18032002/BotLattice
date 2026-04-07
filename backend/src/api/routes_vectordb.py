@@ -9,7 +9,7 @@ from src.pipeline.config.settings import vectordb
 router = APIRouter()
 
 
-@router.get("/vectordb/options/{chunking_type}")
+@router.get("/vector-db/options/{chunking_type}")
 def get_vectordb_options(vectordb_type:VectorDBType):
     key = vectordb_type.value  # safer
 
@@ -32,3 +32,16 @@ def get_collections():
         "vector_db": vectordb.vectordb_type.value,
         "collections": VectorDBFactory.get_collections(vectordb.vectordb_type)
     }
+
+@router.get("/vector-db/GetCurrentDB/")
+def fetch_current_db():
+    current_db = {
+        "Qdrant":"qdrant"
+    }
+    return current_db
+
+@router.post("/vector-db/connect/")
+def connect_vector_db(
+
+):
+    pass

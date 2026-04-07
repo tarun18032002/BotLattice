@@ -5,14 +5,15 @@
  * Uses WebSocket (via useChat) instead of direct Anthropic API calls.
  */
 
-import { useChat }         from "../../hooks/useChat";
-import { useStore }        from "../../store/useStore";
-import { Topbar }          from "../layout/Topbar";
-import { ChatControls }    from "./ChatControls";
-import { ChatInput }       from "./ChatInput";
-import { ChatEmptyState }  from "./ChatEmptyState";
-import { WsStatusBadge }   from "./WsStatusBadge";
+import { useChat }              from "../../hooks/useChat";
+import { useStore }             from "../../store/useStore";
+import { Topbar }               from "../layout/Topbar";
+import { ChatControls }         from "./ChatControls";
+import { ChatInput }            from "./ChatInput";
+import { ChatEmptyState }       from "./ChatEmptyState";
+import { WsStatusBadge }        from "./WsStatusBadge";
 import { MessageBubble, ThinkingIndicator } from "./MessageBubble";
+import { AgentUpdateBubble }    from "./AgentUpdateBubble";
 
 export function ChatPage() {
   const { dispatch } = useStore();
@@ -29,6 +30,8 @@ export function ChatPage() {
     clearChat,
     messagesEndRef,
     wsState,
+    agent, setAgent,
+    sendConfirm,
   } = useChat();
 
   const goToIngest = () => dispatch({ type: "SET_PAGE", payload: "ingest" });
@@ -52,6 +55,8 @@ export function ChatPage() {
         topK={topK}
         onTopKChange={setTopK}
         onClear={clearChat}
+        agent={agent}
+        onAgentChange={setAgent}
       />
 
       {/* Message list */}
@@ -66,13 +71,28 @@ export function ChatPage() {
             {messages.map((m, i) => (
               <MessageBubble key={i} message={m} />
             ))}
+            {messages.map((m, i) => {
+              if (m.role === "agent-update") {
+                return <AgentUpdateBubble key={i} message={m} />;
+              }
+              if (m.role === "confirm-intent") {
+                return (
+                  <AgentUpdateBubble
+                    key={i}
+                    message={m}
+                    onConfirm={sendConfirm}
+                    msgIdx={i}
+                  />
+                );
+              }
+              return <MessageBubble key={i} message={m} />;
+            })}
             {thinking && <ThinkingIndicator />}
             <div ref={messagesEndRef} />
           </>
         )}
       </div>
 
-      {/* Input bar */}
       <ChatInput
         value={input}
         onChange={setInput}

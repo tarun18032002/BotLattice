@@ -15,6 +15,25 @@ VECTORDB_OPTIONS = {
                 "required": True,
                 "default": "lkjfdsxc vbnlythrdcblfcgblhvbb",
                 "description": "Qdrant DB API KEY"
+            },
+            {
+                "name": "Distance metric",
+                "type": "str",
+                "required": True,
+            },
+            {
+                "name": "Hybrid search (BM25 + vector)",
+                "type": "bool",
+                "required": False,
+                "default": False,
+                "description":"Combine sparse lexical and dense semantic retrieval"
+            },
+            {
+                "name": "Hybrid search (BM25 + vector)",
+                "type": "bool",
+                "required": False,
+                "default": False,
+                "description":"Attach source, page number, and timestamp to each chunk"
             }
         ]
     },

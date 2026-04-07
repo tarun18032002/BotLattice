@@ -67,20 +67,57 @@ export const Toggle = ({ checked, onChange, label, sub }) => (
 
 // ── RangeInput ────────────────────────────────────────────────────────────────
 
-export const RangeInput = ({ label, min, max, step, value, onChange, unit = "" }) => (
-  <div className="flex flex-col gap-2">
-    {label && <label className={labelClass}>{label}</label>}
-    <div className="flex items-center gap-3">
-      <input
-        type="range"
-        min={min} max={max} step={step} value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="flex-1 h-[3px] rounded-full cursor-pointer appearance-none bg-[#1d2535]"
-        style={{ accentColor: "#00e5a0" }}
-      />
-      <span className="text-[12px] font-medium text-[#00e5a0] min-w-[40px] text-right font-mono">
-        {value}{unit}
-      </span>
+export function RangeInput({
+  label,
+  value,
+  min = 0,
+  max = 100,
+  step = 1,
+  onChange,
+}) {
+  const handleSliderChange = (e) => {
+    onChange(Number(e.target.value));
+  };
+
+  const handleInputChange = (e) => {
+    let val = Number(e.target.value);
+
+    // Clamp value within range
+    if (val < min) val = min;
+    if (val > max) val = max;
+
+    onChange(val);
+  };
+
+  return (
+    <div>
+      <label className="text-[11px] text-[#8892a4] mb-1 block">
+        {label}
+      </label>
+
+      <div className="flex items-center gap-2">
+        {/* Slider */}
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={handleSliderChange}
+          className="flex-1"
+        />
+
+        {/* Number Input */}
+        <input
+          type="number"
+          value={value}
+          min={min}
+          max={max}
+          step={step}
+          onChange={handleInputChange}
+          className="w-20 p-1 rounded bg-[#0b0f17] border border-[rgba(255,255,255,0.1)] text-sm text-white"
+        />
+      </div>
     </div>
-  </div>
-);
+  );
+}

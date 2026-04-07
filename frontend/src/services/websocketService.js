@@ -124,6 +124,18 @@ class WebSocketManager {
   _emit(state) {
     this._onStateChange?.(state);
   }
+
+  /**
+   * Send any raw JSON payload to the backend.
+   * Used for agent messages and confirm/reject responses.
+   * @param {object} payload
+   * @returns {boolean}
+   */
+  sendRaw(payload) {
+    if (!this._socket || this._socket.readyState !== WebSocket.OPEN) return false;
+    this._socket.send(JSON.stringify(payload));
+    return true;
+  }
 }
 
 // Export a single shared instance

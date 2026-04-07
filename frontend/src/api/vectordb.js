@@ -1,5 +1,5 @@
 export async function fetchVectordbOptions(type) {
-  const res = await fetch(`http://localhost:8000/vectordb/options/${type}`,{
+  const res = await fetch(`http://localhost:8000/vector-db/options/${type}`,{
     method: 'GET',
   }
   );

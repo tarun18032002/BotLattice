@@ -27,6 +27,10 @@ export function useChat() {
   const [thinking,   setThinking]   = useState(false);
   const [wsState,    setWsState]    = useState(WS_STATE.CLOSED);
 
+  // ── Agent mode ──────────────────────────────────────────────────────────────
+  const [agent, setAgent] = useState("none"); // "none" | "prompt_builder"
+  const threadIdRef     = useRef(null);
+
   // Pending question reference — used to detect dropped replies
   const pendingQuestion = useRef(null);
   const messagesEndRef  = useRef(null);
@@ -39,15 +43,54 @@ export function useChat() {
   // ── WebSocket lifecycle ──────────────────────────────────────────────────────
   useEffect(() => {
     wsManager.connect(
-      // onMessage — backend sends { question, answer }
+      // onMessage — handles both RAG { question, answer } and agent stream types
       (data) => {
+        const msgType = data.type;
+
+        if (msgType === "session_start") {
+          threadIdRef.current = data.thread_id;
+          return;
+        }
+
+        if (msgType === "agent_update") {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "agent-update",
+              node: data.node,
+              data: data.data,
+              ts: new Date().toLocaleTimeString(),
+            },
+          ]);
+          return;
+        }
+
+        if (msgType === "confirm_intent") {
+          setThinking(false);
+          setMessages((prev) => [
+            ...prev,
+            {
+              role:      "confirm-intent",
+              intent:    data.intent,
+              message:   data.message,
+              thread_id: data.thread_id,
+              confirmed: null,
+              ts: new Date().toLocaleTimeString(),
+            },
+          ]);
+          return;
+        }
+
+        if (msgType === "done") {
+          setThinking(false);
+          pendingQuestion.current = null;
+          return;
+        }
+
+        // Default: RAG response { question, answer }
         setThinking(false);
         pendingQuestion.current = null;
 
-        // Use real sources from backend if provided,
-        // otherwise fall back to placeholder chips.
-        // To send real sources, add a "sources" array to your
-        // FastAPI response: { question, answer, sources: ["file.pdf", ...] }
         const sources = settings.showSources
           ? (Array.isArray(data.sources) && data.sources.length > 0
               ? data.sources
@@ -94,7 +137,7 @@ export function useChat() {
     const text = input.trim();
     if (!text || thinking) return;
 
-    if (mode === "rag" && !collection) {
+    if (agent === "none" && mode === "rag" && !collection) {
       alert("Select a collection before sending in RAG mode.");
       return;
     }
@@ -115,8 +158,17 @@ export function useChat() {
     pendingQuestion.current = text;
 
     // ── Send to FastAPI WebSocket ─────────────────────────────────────────────
-    // Payload shape: { question: string, collection_name: string }
-    const sent = wsManager.send(text, collection || "default");
+    let sent;
+    if (agent === "prompt_builder") {
+      sent = wsManager.sendRaw({
+        agent:           "prompt_builder",
+        question:        text,
+        collection_name: collection || "resume",
+        thread_id:       threadIdRef.current || undefined,
+      });
+    } else {
+      sent = wsManager.send(text, collection || "default");
+    }
 
     if (!sent) {
       setThinking(false);
@@ -133,7 +185,19 @@ export function useChat() {
     }
   }, [input, thinking, collection, mode, wsState]);
 
-  const clearChat = useCallback(() => setMessages([]), []);
+  const clearChat = useCallback(() => {
+    setMessages([]);
+    threadIdRef.current = null;
+  }, []);
+
+  // ── Confirm / Reject intent (prompt_builder HitL) ─────────────────────────
+  const sendConfirm = useCallback((confirmed, msgIdx) => {
+    wsManager.sendRaw({ type: "confirm", confirmed });
+    setThinking(true);
+    setMessages((prev) =>
+      prev.map((m, i) => (i === msgIdx ? { ...m, confirmed } : m))
+    );
+  }, []);
 
   const activeCollection = collections.find((c) => c.name === collection) ?? null;
 
@@ -144,6 +208,8 @@ export function useChat() {
     mode, setMode,
     topK, setTopK,
     wsState,
+    agent, setAgent,
+    sendConfirm,
   };
 }
 

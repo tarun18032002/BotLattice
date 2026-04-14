@@ -63,14 +63,19 @@ class WebSocketManager {
   }
 
   /**
-   * Send a chat message to the backend.
+   * Send a RAG chat message to the backend.
    * @param {string} question        - The user's question
-   * @param {string} collection_name - Active collection name
+   * @param {string} collection_name - Active collection name (defaults to 'resume')
    * @returns {boolean}              - false if socket not open
    */
-  send(question, collection_name) {
-    if (!this._socket || this._socket.readyState !== WebSocket.OPEN) return false;
-    this._socket.send(JSON.stringify({ question, collection_name }));
+  send(question, collection_name = "resume") {
+    if (!this._socket || this._socket.readyState !== WebSocket.OPEN) {
+      console.warn("[WS] Socket not open. State:", this._socket?.readyState, "Expected:", WebSocket.OPEN);
+      return false;
+    }
+    const payload = { question, collection_name };
+    console.log("[WS] Sending RAG query:", payload);
+    this._socket.send(JSON.stringify(payload));
     return true;
   }
 
@@ -81,6 +86,10 @@ class WebSocketManager {
 
     try {
       this._socket = new WebSocket(WS_URL);
+      console.log("[WS] Attempting to connect to:", WS_URL, {
+        timestamp: new Date().toISOString(),
+        readyState: this._socket?.readyState,
+      });
     } catch (err) {
       console.error("[WS] Failed to construct WebSocket:", err);
       this._emit(WS_STATE.ERROR);
@@ -89,11 +98,15 @@ class WebSocketManager {
     }
 
     this._socket.onopen = () => {
-      console.log("[WS] Connected →", WS_URL);
+      console.log("[WS] Connected ✓", WS_URL, {
+        timestamp: new Date().toISOString(),
+        readyState: this._socket?.readyState,
+      });
       this._emit(WS_STATE.OPEN);
     };
 
     this._socket.onmessage = (event) => {
+      console.log("[WS] Received:", event.data);
       try {
         const data = JSON.parse(event.data);
         this._onMessage?.(data);
@@ -103,12 +116,22 @@ class WebSocketManager {
     };
 
     this._socket.onerror = (err) => {
-      console.error("[WS] Error:", err);
+      console.error("[WS] Error Event:", {
+        type: err.type,
+        message: err.message,
+        readyState: this._socket?.readyState,
+        url: this._socket?.url,
+        timestamp: new Date().toISOString(),
+        browserInfo: navigator.userAgent,
+      });
       this._emit(WS_STATE.ERROR);
     };
 
     this._socket.onclose = (event) => {
-      console.log(`[WS] Closed — code: ${event.code}`);
+      console.log(`[WS] Closed — code: ${event.code}, wasClean: ${event.wasClean}`, {
+        reason: event.reason,
+        timestamp: new Date().toISOString(),
+      });
       this._emit(WS_STATE.CLOSED);
       if (this._shouldReconnect) this._scheduleReconnect();
     };
@@ -116,6 +139,7 @@ class WebSocketManager {
 
   _scheduleReconnect(delay = 3000) {
     console.log(`[WS] Reconnecting in ${delay}ms…`);
+    clearTimeout(this._reconnectTimer);
     this._reconnectTimer = setTimeout(() => {
       if (this._shouldReconnect) this._open();
     }, delay);
@@ -132,7 +156,11 @@ class WebSocketManager {
    * @returns {boolean}
    */
   sendRaw(payload) {
-    if (!this._socket || this._socket.readyState !== WebSocket.OPEN) return false;
+    if (!this._socket || this._socket.readyState !== WebSocket.OPEN) {
+      console.warn("[WS] Socket not open for raw send");
+      return false;
+    }
+    console.log("[WS] Sending raw payload:", payload);
     this._socket.send(JSON.stringify(payload));
     return true;
   }

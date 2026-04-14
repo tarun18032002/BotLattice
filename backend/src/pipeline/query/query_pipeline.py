@@ -3,39 +3,44 @@ from src.pipeline.config.enums import VectorDBType, CollectionMode
 from src.pipeline.query.retriever import get_retriever
 from src.pipeline.query.query_engine import build_query_engine
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from src.pipeline.config.settings import demension
 
 def run_query(query:str,collection_name:str,db_type:VectorDBType):
     """
     Main RAG Query pipeline 
     """
+    try : 
+        if not isinstance(query, str) or not query.strip():
+            raise ValueError("query must be a non-empty string")
 
-    if not isinstance(query, str) or not query.strip():
-        raise ValueError("query must be a non-empty string")
+        if not isinstance(collection_name, str) or not collection_name.strip():
+            raise ValueError("collection_name must be a non-empty string")
 
-    if not isinstance(collection_name, str) or not collection_name.strip():
-        raise ValueError("collection_name must be a non-empty string")
+        query = query.strip()
+        collection_name = collection_name.strip()
 
-    query = query.strip()
-    collection_name = collection_name.strip()
+        print(f"Running RAG query: '{query}' against collection '{collection_name}' using DB '{db_type}'")
+        # Connect to existing vector store
+        index = VectorDBFactory.create_index(
+            db_type= db_type,
+            mode=None,
+            collection_name=collection_name,
+            dim= demension 
+        )
 
+        print(f"index of type {type(index)} created successfully for collection '{collection_name}'")
+        # Create retriever
+        retriever = get_retriever(index)
 
-    # Connect to existing vector store
-    index = VectorDBFactory.create_index(
-        db_type= db_type,
-        mode=CollectionMode.APPEND_TO_EXISTING,
-        collection_name=collection_name
-    )
+        # Create query engine
+        query_engine = build_query_engine(retriever)
 
-    # Create retriever
-    retriever = get_retriever(index)
+        # Run query
+        response = query_engine.query(query)
 
-    # Create query engine
-    query_engine = build_query_engine(retriever)
-
-    # Run query
-    response = query_engine.query(query)
-
-    return response
+        return response
+    except Exception as e:
+        raise RuntimeError(f"Error during query execution: {str(e)}")
 
 
 

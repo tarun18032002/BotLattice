@@ -58,9 +58,11 @@ class Chunking:
         return splitter_map[self.chunking_type]()
 
     def split(self, documents):
+        try :
+            splitter = self.get_splitter()
 
-        splitter = self.get_splitter()
+            nodes = splitter.get_nodes_from_documents(documents)
 
-        nodes = splitter.get_nodes_from_documents(documents)
-
-        return nodes
+            return nodes
+        except Exception as e:
+            raise ValueError(f"Error during chunking: {str(e)}")

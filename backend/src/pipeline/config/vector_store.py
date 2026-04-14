@@ -1,4 +1,5 @@
 import os
+import json
 
 # LlamaIndex Core
 from llama_index.core import StorageContext, VectorStoreIndex
@@ -15,10 +16,17 @@ import qdrant_client
 # import faiss
 
 from src.pipeline.config.enums import VectorDBType,CollectionMode
+from src.pipeline.config.vectordb_state import active_vectordb
 
 
 class VectorDBFactory:
     """Factory to create and manage connections to different Vector DBs."""
+
+    @staticmethod
+    def _normalize_db_type(db_type: VectorDBType | str) -> VectorDBType:
+        if isinstance(db_type, VectorDBType):
+            return db_type
+        return VectorDBType(db_type)
     
     @staticmethod
     def get_vector_store(
@@ -27,13 +35,15 @@ class VectorDBFactory:
         dim: int = 1536,
         **kwargs
     ) -> BasePydanticVectorStore:
+        db_type = VectorDBFactory._normalize_db_type(db_type)
         
         if db_type == VectorDBType.QDRANT:
-            # Expects QDRANT_URL and QDRANT_API_KEY in env
-            print(f"The QDrant Url : {os.getenv('QDRANT_URL')}")
+            url = active_vectordb.url or "http://localhost:6333"
+            api_key = active_vectordb.api_key
+            print(f"The QDrant Url : {url}")
             client = qdrant_client.QdrantClient(
-                url=os.getenv("QDRANT_URL", "http://localhost:6333"),
-                api_key=os.getenv("QDRANT_API_KEY"),
+                url=url,
+                api_key=api_key,
             )
             return QdrantVectorStore(client=client, collection_name=collection_name)
 
@@ -57,13 +67,16 @@ class VectorDBFactory:
         """
         Fetch all collection names from the configured vector DB
         """
+        db_type = VectorDBFactory._normalize_db_type(db_type)
 
         if db_type == VectorDBType.QDRANT:
             import qdrant_client
 
+            url = active_vectordb.url or "http://localhost:6333"
+            api_key = active_vectordb.api_key
             client = qdrant_client.QdrantClient(
-                url=os.getenv("QDRANT_URL", "http://localhost:6333"),
-                api_key=os.getenv("QDRANT_API_KEY"),
+                url=url,
+                api_key=api_key,
             )
 
             collections = client.get_collections()
@@ -85,34 +98,77 @@ class VectorDBFactory:
     @classmethod
     def _delete_collection(cls, db_type: VectorDBType, collection_name: str):
         """Delete a collection from the vector DB."""
+        db_type = cls._normalize_db_type(db_type)
         if db_type == VectorDBType.QDRANT:
+            url = active_vectordb.url or "http://localhost:6333"
+            api_key = active_vectordb.api_key
             client = qdrant_client.QdrantClient(
-                url=os.getenv("QDRANT_URL", "http://localhost:6333"),
-                api_key=os.getenv("QDRANT_API_KEY"),
+                url=url,
+                api_key=api_key,
             )
             client.delete_collection(collection_name)
         else:
             raise ValueError(f"Unsupported DB type for deletion: {db_type}")
 
     @classmethod
-    def create_index(cls, db_type: VectorDBType,mode:CollectionMode, collection_name: str, nodes=None, dim=1536):
+    def create_index(cls, db_type: VectorDBType,mode:CollectionMode | None, collection_name: str, nodes=None, dim=1536):
         """Prepares a LlamaIndex VectorStoreIndex ready for query or ingestion."""
-        vector_store = cls.get_vector_store(db_type, collection_name, dim=dim)
-        
-        # Handle overwrite
-        if mode == "Replace_existing":
-            cls._delete_collection(db_type,collection_name)
-            vector_store = cls.get_vector_store(db_type,collection_name,dim=dim)
+        try:
+            db_type = cls._normalize_db_type(db_type)
+            vector_store = cls.get_vector_store(db_type, collection_name, dim=dim)
 
-        storage_context = StorageContext.from_defaults(vector_store=vector_store)
-        
-        if nodes:
-            # Ingestion mode
-            print(f"----- ingest nodes,{len(nodes)}")
-            return VectorStoreIndex(nodes, storage_context=storage_context)
-        else:
-            # Query mode (connect to existing)
-            print(f"----- query nodes")
+            if mode == CollectionMode.REPLACE_EXISTING:
+                cls._delete_collection(db_type, collection_name)
+                vector_store = cls.get_vector_store(db_type, collection_name, dim=dim)
+
+            storage_context = StorageContext.from_defaults(vector_store=vector_store)
+
+            if nodes:
+                return VectorStoreIndex(nodes, storage_context=storage_context)
+
             return VectorStoreIndex.from_vector_store(vector_store)
+        except Exception as e:
+            raise RuntimeError(f"Error creating index for collection '{collection_name}': {str(e)}")
+
+    @classmethod
+    def create_index_with_logs(
+        cls,
+        db_type: VectorDBType | str,
+        mode: CollectionMode | None,
+        collection_name: str,
+        nodes=None,
+        dim: int = 1536,
+    ):
+        """Yield ingestion progress logs and return the built index at the end."""
+        db_type = cls._normalize_db_type(db_type)
+
+        try:
+            if mode == CollectionMode.REPLACE_EXISTING:
+                yield json.dumps({
+                    "msg": f"Collection '{collection_name}' already exists. Replacing it as per 'Replace_existing' mode.",
+                    "level": "warning"
+                }) + "\n"
+
+            if nodes:
+                yield json.dumps({
+                    "msg": f"ingest nodes: {len(nodes)}",
+                    "level": "info"
+                }) + "\n"
+
+            index = cls.create_index(
+                db_type=db_type,
+                mode=mode,
+                collection_name=collection_name,
+                nodes=nodes,
+                dim=dim,
+            )
+
+            return index
+        except Exception as e:
+            yield json.dumps({
+                "msg": f"Error creating index for collection '{collection_name}': {str(e)}",
+                "level": "error"
+            }) + "\n"
+            raise
 
     

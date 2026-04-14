@@ -1,29 +1,31 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { fetchCollections, deleteCollection as apiDeleteCollection } from "../api/vectordb";
 
 export function useCollections() {
   const [collections, setCollections] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState(null);
 
-  useEffect(() => {
-    const fetchCollections = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(
-          "http://127.0.0.1:8000/vector-db/collections"
-        );
-
-        const data = await res.json();
-
-        setCollections(data.collections || []);
-      } catch (err) {
-        console.error("Error fetching collections:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCollections();
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchCollections();
+      setCollections(data);
+    } catch (err) {
+      console.error("Error fetching collections:", err);
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  return { collections, loading };
+  useEffect(() => { load(); }, [load]);
+
+  const removeCollection = useCallback(async (name) => {
+    await apiDeleteCollection(name);
+    setCollections((prev) => prev.filter((c) => c.name !== name));
+  }, []);
+
+  return { collections, loading, error, refresh: load, removeCollection };
 }

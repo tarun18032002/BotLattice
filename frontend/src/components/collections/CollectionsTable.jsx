@@ -1,7 +1,16 @@
 import { Badge, Button } from "../ui/Primitives";
 import { TrashIcon } from "../ui/Icons";
 
-const COL_HEADERS = ["Name", "Vector DB", "Embedding", "Chunks", "Docs", "Strategy", "Created", "Status", ""];
+const COL_HEADERS = ["Name", "Vector DB", "Vectors", "Dimensions", "Distance", "Docs", "Status", ""];
+
+const STATUS_VARIANT = { green: "green", yellow: "amber", grey: "default", red: "red", unknown: "default" };
+function statusVariant(s) {
+  const lower = (s ?? "").toLowerCase();
+  if (lower === "green" || lower === "ok" || lower === "ready") return "green";
+  if (lower === "yellow") return "amber";
+  if (lower === "red" || lower === "error") return "red";
+  return "default";
+}
 
 export function CollectionsTable({ collections, onDelete }) {
   return (
@@ -21,7 +30,7 @@ export function CollectionsTable({ collections, onDelete }) {
         </thead>
         <tbody>
           {collections.map((col, i) => (
-            <CollectionRow key={i} col={col} onDelete={() => onDelete(col.name)} />
+            <CollectionRow key={col.name ?? i} col={col} onDelete={() => onDelete(col.name)} />
           ))}
         </tbody>
       </table>
@@ -38,35 +47,23 @@ function CollectionRow({ col, onDelete }) {
       <td className="px-4 py-3">
         <Badge variant="blue">{col.db}</Badge>
       </td>
-      <td className="px-4 py-3 text-[11px] text-[#8892a4] font-mono max-w-[160px] truncate">
-        {col.embed}
-      </td>
       <td className="px-4 py-3 text-[13px] font-mono text-[#e8eaf0]">
-        {col.chunks.toLocaleString()}
+        {(col.chunks ?? 0).toLocaleString()}
+      </td>
+      <td className="px-4 py-3 text-[13px] font-mono text-[#8892a4]">
+        {col.dim ? `${col.dim}d` : "—"}
+      </td>
+      <td className="px-4 py-3">
+        <Badge variant="amber">{col.distance || "—"}</Badge>
       </td>
       <td className="px-4 py-3 text-[13px] font-mono text-[#8892a4]">
         {col.docs ?? "—"}
       </td>
       <td className="px-4 py-3">
-        <Badge variant="amber">{col.strategy}</Badge>
-      </td>
-      <td className="px-4 py-3 text-[11px] text-[#4d5669]">
-        {col.created}
-      </td>
-      <td className="px-4 py-3">
-        <Badge variant="green">ready</Badge>
+        <Badge variant={statusVariant(col.status)}>{col.status || "unknown"}</Badge>
       </td>
       <td className="px-4 py-3 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button
-          variant="danger"
-          size="xs"
-          icon={<TrashIcon />}
-          onClick={() => {
-            if (window.confirm(`Delete collection "${col.name}"? This cannot be undone.`)) {
-              onDelete();
-            }
-          }}
-        >
+        <Button variant="danger" size="xs" icon={<TrashIcon />} onClick={onDelete}>
           Delete
         </Button>
       </td>

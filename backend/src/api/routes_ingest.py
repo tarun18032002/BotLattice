@@ -4,6 +4,7 @@ import shutil
 import logging
 import json
 import os
+import tempfile
 
 from src.pipeline.config  import settings
 from src.pipeline.ingestion.pipeline import run_ingestion_pipeline
@@ -37,39 +38,39 @@ async def ingest_file(
         handler = StreamLogHandler(logs)
         logging.getLogger().addHandler(handler)
 
-        yield json.dumps({
-            "msg": "Starting ingestion...",
-            "level": "info"
-        }) + "\n"
+        try:
+            yield json.dumps({
+                "msg": "Starting ingestion...",
+                "level": "info"
+            }) + "\n"
 
-        dir = 'temp'
-        os.makedirs(dir,exist_ok=True)
-        file_location = f"{dir}/{file.filename}"
+            with tempfile.TemporaryDirectory() as temp_dir:
+                file_location = os.path.join(temp_dir, file.filename)
 
-        # Save uploaded file
-        with open(file_location, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+                # Save uploaded file in a temporary directory that is auto-cleaned.
+                with open(file_location, "wb") as buffer:
+                    shutil.copyfileobj(file.file, buffer)
 
-        yield json.dumps({
-            "msg": "File uploaded successfully",
-            "level": "success"
-        }) + "\n"
+                yield json.dumps({
+                    "msg": "File uploaded successfully",
+                    "level": "success"
+                }) + "\n"
 
-        # Run pipeline and stream logs
-        for log in run_ingestion_pipeline(
-            file_path=file_location,
-            chunking=chunking_obj,
-            collection= collection_obj
+                # Run pipeline and stream logs
+                for log in run_ingestion_pipeline(
+                    file_path=file_location,
+                    chunking=chunking_obj,
+                    collection= collection_obj
 
-        ):
-            yield log
+                ):
+                    yield log
 
-        yield json.dumps({
-            "msg": "Ingestion complete",
-            "level": "success",
-            "done": True
-        }) + "\n"
-
-        logging.getLogger().removeHandler(handler)
+            yield json.dumps({
+                "msg": "Ingestion complete",
+                "level": "success",
+                "done": True
+            }) + "\n"
+        finally:
+            logging.getLogger().removeHandler(handler)
 
     return StreamingResponse(log_stream(), media_type="application/json")

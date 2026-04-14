@@ -1,5 +1,8 @@
+import { useEffect, useMemo, useState } from "react";
 import { useStore } from "../../store/useStore";
 import { UploadIcon, ChatIcon, DatabaseIcon, SettingsIcon } from "../ui/Icons";
+import { fetchCurrentEmbedding } from "../../api/embeddings";
+import { fetchCollections, fetchCurrentVectordb } from "../../api/vectordb";
 
 const NAV_ITEMS = [
   { id: "ingest",      label: "Ingestion",   Icon: UploadIcon },
@@ -11,15 +14,63 @@ const NAV_ITEMS = [
 export function Sidebar() {
   const { state, dispatch } = useStore();
   const { page, ingestion, collections } = state;
+  const [activeCollection, setActiveCollection] = useState("—");
+  const [activeEmbedder, setActiveEmbedder] = useState("—");
+  const [activeVectorDb, setActiveVectorDb] = useState("—");
 
   const setPage = (id) => dispatch({ type: "SET_PAGE", payload: id });
 
-  const summary = [
-    ["Collection", ingestion.collectionName || "—"],
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        const [currentEmbedding, currentVectordb, allCollections] = await Promise.all([
+          fetchCurrentEmbedding().catch(() => null),
+          fetchCurrentVectordb().catch(() => null),
+          fetchCollections().catch(() => []),
+        ]);
+
+        if (!mounted) return;
+
+        if (currentEmbedding?.provider && currentEmbedding?.model) {
+          setActiveEmbedder(`${currentEmbedding.provider}/${currentEmbedding.model}`);
+        } else {
+          setActiveEmbedder("—");
+        }
+
+        if (currentVectordb?.vectordb_type) {
+          setActiveVectorDb(currentVectordb.vectordb_type);
+        } else {
+          setActiveVectorDb("—");
+        }
+
+        if (allCollections.length === 0) {
+          setActiveCollection("—");
+        } else if (allCollections.length === 1) {
+          setActiveCollection(allCollections[0].name);
+        } else {
+          setActiveCollection(`${allCollections.length} collections`);
+        }
+      } catch {
+        if (!mounted) return;
+        setActiveCollection("—");
+        setActiveEmbedder("—");
+        setActiveVectorDb("—");
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [page]);
+
+  const summary = useMemo(() => [
+    ["Collection", activeCollection],
     ["Chunker",    ingestion.chunkStrategy],
-    ["Embedder",   ingestion.embedProvider],
-    ["Vector DB",  ingestion.vectorDB],
-  ];
+    ["Embedder",   activeEmbedder],
+    ["Vector DB",  activeVectorDb],
+  ], [activeCollection, activeEmbedder, activeVectorDb, ingestion.chunkStrategy]);
 
   return (
     <aside className="w-[216px] min-w-[216px] bg-[#0b0d11] border-r border-[rgba(255,255,255,0.06)] flex flex-col h-screen">

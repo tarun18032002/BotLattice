@@ -11,14 +11,19 @@ class QueryRequest(BaseModel):
 
 @router.post("/query")
 def query_rag(req: QueryRequest):
+    try : 
+        response = run_query(
+            req.question,
+            collection_name=req.collection_name,
+            db_type=VectorDBType.QDRANT,
 
-    response = run_query(
-        req.question,
-        collection_name=req.collection_name,
-        db_type=VectorDBType.QDRANT
-    )
+        )
 
-    return {
-        "question": req.question,
-        "answer": response
-    }
+        return {
+            "question": req.question,
+            "answer": response
+        }
+    except Exception as e:
+        return {
+            "error": str(e)
+        }

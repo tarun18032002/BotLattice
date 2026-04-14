@@ -27,6 +27,22 @@ export function IngestionPage() {
     updateIngestion,
     running,
     run,
+    embeddingLoading,
+    embeddingSaving,
+    embeddingConfigured,
+    embeddingEditing,
+    beginEmbeddingEdit,
+    cancelEmbeddingEdit,
+    embeddingError,
+    saveEmbedding,
+    vectordbLoading,
+    vectordbSaving,
+    vectordbConfigured,
+    vectordbEditing,
+    beginVectordbEdit,
+    cancelVectordbEdit,
+    vectordbError,
+    saveVectordb,
     logs,
     logRef,
     stats,
@@ -119,8 +135,8 @@ export function IngestionPage() {
                       options={[
                         { label: "Choose a collection...", value: "" },
                         ...collections.map((c) => ({
-                          label: c,
-                          value: c,
+                          label: c.name,
+                          value: c.name,
                         })),
                       ]}
                       value={ingestion.collectionName || ""}
@@ -161,13 +177,35 @@ export function IngestionPage() {
               </div>
             </Card>
 
-            <VectorDBConfig config={ingestion} onChange={updateIngestion} />
+            <VectorDBConfig
+              config={ingestion}
+              onChange={updateIngestion}
+              loading={vectordbLoading}
+              saving={vectordbSaving}
+              configured={vectordbConfigured}
+              editing={vectordbEditing}
+              error={vectordbError}
+              onEdit={beginVectordbEdit}
+              onCancel={cancelVectordbEdit}
+              onSave={saveVectordb}
+            />
           </div>
 
           {/* RIGHT */}
           <div className="space-y-4">
             <ChunkingConfig config={ingestion} onChange={updateIngestion} />
-            <EmbeddingConfig config={ingestion} onChange={updateIngestion} />
+            <EmbeddingConfig
+              config={ingestion}
+              onChange={updateIngestion}
+              loading={embeddingLoading}
+              saving={embeddingSaving}
+              configured={embeddingConfigured}
+              editing={embeddingEditing}
+              error={embeddingError}
+              onEdit={beginEmbeddingEdit}
+              onCancel={cancelEmbeddingEdit}
+              onSave={saveEmbedding}
+            />
           </div>
         </div>
 

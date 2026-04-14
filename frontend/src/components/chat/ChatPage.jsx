@@ -68,9 +68,6 @@ export function ChatPage() {
           />
         ) : (
           <>
-            {messages.map((m, i) => (
-              <MessageBubble key={i} message={m} />
-            ))}
             {messages.map((m, i) => {
               if (m.role === "agent-update") {
                 return <AgentUpdateBubble key={i} message={m} />;

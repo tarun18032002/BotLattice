@@ -13,10 +13,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { wsManager, WS_STATE } from "../services/websocketService";
 import { useStore } from "../store/useStore";
+import { useCollections } from "./useCollections";
 
 export function useChat() {
   const { state } = useStore();
-  const { collections, settings } = state;
+  const { settings } = state;
+  const { collections } = useCollections();
 
   // ── Local state ─────────────────────────────────────────────────────────────
   const [messages,   setMessages]   = useState([]);
@@ -46,13 +48,16 @@ export function useChat() {
       // onMessage — handles both RAG { question, answer } and agent stream types
       (data) => {
         const msgType = data.type;
+        console.log("[CHAT] Received message type:", msgType, "data:", data);
 
         if (msgType === "session_start") {
           threadIdRef.current = data.thread_id;
+          console.log("[CHAT] Session started with thread_id:", data.thread_id);
           return;
         }
 
         if (msgType === "agent_update") {
+          console.log("[CHAT] Agent update from node:", data.node);
           setMessages((prev) => [
             ...prev,
             {
@@ -66,6 +71,7 @@ export function useChat() {
         }
 
         if (msgType === "confirm_intent") {
+          console.log("[CHAT] Confirmation needed for intent:", data.intent);
           setThinking(false);
           setMessages((prev) => [
             ...prev,
@@ -82,30 +88,51 @@ export function useChat() {
         }
 
         if (msgType === "done") {
+          console.log("[CHAT] Done signal received");
           setThinking(false);
           pendingQuestion.current = null;
           return;
         }
 
-        // Default: RAG response { question, answer }
-        setThinking(false);
-        pendingQuestion.current = null;
+        if (msgType === "error") {
+          console.error("[CHAT] Error from server:", data.error);
+          setThinking(false);
+          pendingQuestion.current = null;
+          setMessages((prev) => [
+            ...prev,
+            {
+              role:    "assistant",
+              content: `⚠ Error: ${data.error}`,
+              sources: [],
+              ts: new Date().toLocaleTimeString(),
+            },
+          ]);
+          return;
+        }
 
-        const sources = settings.showSources
-          ? (Array.isArray(data.sources) && data.sources.length > 0
-              ? data.sources
-              : collection ? buildFakeSources(collection, collections) : [])
-          : [];
+        // RAG response or legacy format
+        if (msgType === "rag_response" || !msgType) {
+          console.log("[CHAT] Processing RAG response");
+          const sources = settings.showSources
+            ? (Array.isArray(data.sources) && data.sources.length > 0
+                ? data.sources
+                : collection ? buildFakeSources(collection, collections) : [])
+            : [];
 
-        setMessages((prev) => [
-          ...prev,
-          {
-            role:    "assistant",
-            content: data.answer ?? "(empty response)",
-            sources,
-            ts: new Date().toLocaleTimeString(),
-          },
-        ]);
+          setMessages((prev) => [
+            ...prev,
+            {
+              role:    "assistant",
+              content: data.answer ?? "(empty response)",
+              sources,
+              ts: new Date().toLocaleTimeString(),
+            },
+          ]);
+          return;
+        }
+
+        // Ignore unknown message types
+        console.warn("[WS] Unknown message type:", msgType, data);
       },
       // onStateChange
       (newState) => {
@@ -160,6 +187,7 @@ export function useChat() {
     // ── Send to FastAPI WebSocket ─────────────────────────────────────────────
     let sent;
     if (agent === "prompt_builder") {
+      console.log("[CHAT] Sending prompt_builder with collection:", collection);
       sent = wsManager.sendRaw({
         agent:           "prompt_builder",
         question:        text,
@@ -167,7 +195,8 @@ export function useChat() {
         thread_id:       threadIdRef.current || undefined,
       });
     } else {
-      sent = wsManager.send(text, collection || "default");
+      console.log("[CHAT] Sending RAG query with collection:", collection);
+      sent = wsManager.send(text, collection || "resume");
     }
 
     if (!sent) {

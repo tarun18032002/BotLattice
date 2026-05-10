@@ -34,6 +34,8 @@ async def ingest_file(
     async def log_stream():
 
         logs = []
+        chunk_count = 0
+        doc_count = 0
 
         handler = StreamLogHandler(logs)
         logging.getLogger().addHandler(handler)
@@ -64,13 +66,24 @@ async def ingest_file(
 
                 ):
                     yield log
+                    # Capture metadata from pipeline
+                    try:
+                        parsed = json.loads(log.strip())
+                        if "chunks" in parsed and isinstance(parsed["chunks"], int):
+                            chunk_count = parsed["chunks"]
+                        if "documents" in parsed and isinstance(parsed["documents"], int):
+                            doc_count = parsed["documents"]
+                    except (json.JSONDecodeError, AttributeError):
+                        pass
 
             yield json.dumps({
                 "msg": "Ingestion complete",
                 "level": "success",
-                "done": True
+                "done": True,
+                "chunks": chunk_count,
+                "documents": doc_count
             }) + "\n"
         finally:
             logging.getLogger().removeHandler(handler)
 
-    return StreamingResponse(log_stream(), media_type="application/json")
+    return StreamingResponse(log_stream(), media_type="application/x-ndjson")

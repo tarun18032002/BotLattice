@@ -8,6 +8,7 @@ def get_retriever(index, similarity_top_k: int = 5):
     retriever = VectorIndexRetriever(
         index=index,
         similarity_top_k=similarity_top_k,
+       
     )
 
     return retriever

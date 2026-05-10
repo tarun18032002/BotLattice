@@ -111,6 +111,29 @@ class VectorDBFactory:
             raise ValueError(f"Unsupported DB type for deletion: {db_type}")
 
     @classmethod
+    def get_collection_dimension(cls, db_type: VectorDBType, collection_name: str) -> int:
+        """Get vector dimension from a collection in the vector DB."""
+        db_type = cls._normalize_db_type(db_type)
+        if db_type == VectorDBType.QDRANT:
+            url = active_vectordb.url or "http://localhost:6333"
+            api_key = active_vectordb.api_key
+            client = qdrant_client.QdrantClient(
+                url=url,
+                api_key=api_key,
+            )
+            try:
+                collection_info = client.get_collection(collection_name)
+                # Qdrant stores vector size as collection_info.config.params.vectors.size
+                if hasattr(collection_info.config.params, 'vectors'):
+                    if hasattr(collection_info.config.params.vectors, 'size'):
+                        return collection_info.config.params.vectors.size
+            except Exception as e:
+                print(f"Warning: Could not fetch collection dimension from Qdrant: {e}")
+            return 384  # Fallback to BAAI/bge-small-en-v1.5 default
+        else:
+            raise ValueError(f"Unsupported DB type: {db_type}")
+
+    @classmethod
     def create_index(cls, db_type: VectorDBType,mode:CollectionMode | None, collection_name: str, nodes=None, dim=1536):
         """Prepares a LlamaIndex VectorStoreIndex ready for query or ingestion."""
         try:

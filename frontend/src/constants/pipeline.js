@@ -10,7 +10,7 @@ export const LLM_PROVIDERS = [
 
 export const LLM_MODELS = {
   anthropic: ["claude-sonnet-4-20250514", "claude-opus-4-20250514", "claude-haiku-4-5-20251001"],
-  openai:    ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"],
+  openai:    ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo","gpt-5.4-mini"],
   groq:      ["llama-3.3-70b-versatile", "mixtral-8x7b-32768", "gemma2-9b-it"],
   ollama:    ["llama3.2", "mistral", "phi3", "gemma2"],
   mistral:   ["mistral-large-latest", "mistral-medium-latest", "mistral-small-latest"],

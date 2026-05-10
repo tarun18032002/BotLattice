@@ -1,0 +1,55 @@
+import threading
+
+
+_EMBED_LOCK = threading.Lock()
+_EMBED_READY = False
+
+
+def _restore_embed_model_once() -> bool:
+    from src.pipeline.config.embedding_config import active_embedding
+    from src.pipeline.config.embedding_factory import create_embed_model
+    from llama_index.core import Settings
+
+    if not active_embedding.connected:
+        return False
+
+    provider = active_embedding.provider
+    model = active_embedding.model
+    api_key = active_embedding.api_key
+
+    embed_model = create_embed_model(
+        provider=provider,
+        model=model,
+        api_key=api_key,
+        batch_size=active_embedding.batch_size,
+        normalize=active_embedding.normalize,
+        cache=active_embedding.cache,
+    )
+    
+    Settings.embed_model = embed_model
+    print(f"[startup] Restored embed model: {provider}/{model}")
+    return True
+
+
+def ensure_embed_model_ready() -> None:
+    """Load persisted embed model lazily (safe to call multiple times)."""
+    global _EMBED_READY
+
+    if _EMBED_READY:
+        return
+
+    with _EMBED_LOCK:
+        if _EMBED_READY:
+            return
+
+        try:
+            _EMBED_READY = _restore_embed_model_once()
+        except Exception as exc:
+            print(f"[startup] Could not restore embed model: {exc}")
+
+
+def warm_embed_model_in_background() -> None:
+    """Kick off non-blocking embed model warm-up during app startup."""
+
+    thread = threading.Thread(target=ensure_embed_model_ready, daemon=True)
+    thread.start()

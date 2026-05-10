@@ -1,5 +1,5 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from src.pipeline.query.query_pipeline import run_query
+from src.pipeline.query.query_pipeline import run_query, run_direct_query
 from src.pipeline.config.enums import VectorDBType
 from src.multi_agent.graph import graph as prompt_builder_graph
 from langgraph.types import Command
@@ -150,9 +150,9 @@ async def websocket_chat(websocket: WebSocket):
                 }))
                 continue
 
-            if message.get("agent") == "prompt_builder":
-                await _run_prompt_builder(websocket, message)
-                continue
+            # if message.get("agent") == "prompt_builder":
+            #     await _run_prompt_builder(websocket, message)
+            #     continue
 
             # Confirm/reject payloads are only valid while inside prompt-builder
             # interrupt flow. Ignore safely if received at top level.
@@ -174,16 +174,33 @@ async def websocket_chat(websocket: WebSocket):
 
             question = question.strip()
             collection = message.get("collection_name", "resume")
+            top_k = message.get("top_k")
+            mode = message.get("mode", "rag")
+            system_prompt = message.get("system_prompt")
+            retrieval_settings = message.get("retrieval_settings")
+            if not isinstance(retrieval_settings, dict):
+                retrieval_settings = None
+            if not isinstance(system_prompt, str):
+                system_prompt = None
             if not isinstance(collection, str) or not collection.strip():
                 collection = "resume"
-            print(f"Running RAG query: '{question}' against collection '{collection}'")
+            print(f"Running query mode='{mode}' question='{question}' collection='{collection}'")
             try:
-                response = await asyncio.to_thread(
-                    run_query,
-                    query=question,
-                    collection_name=collection,
-                    db_type=VectorDBType.QDRANT,
-                )
+                if mode == "direct":
+                    response = await asyncio.to_thread(
+                        run_direct_query,
+                        query=question,
+                        system_prompt=system_prompt,
+                    )
+                else:
+                    response = await asyncio.to_thread(
+                        run_query,
+                        query=question,
+                        collection_name=collection,
+                        db_type=VectorDBType.QDRANT,
+                        top_k=top_k,
+                        retrieval_settings=retrieval_settings,
+                    )
 
             except Exception as exc:
                 await websocket.send_text(json.dumps({
@@ -193,7 +210,7 @@ async def websocket_chat(websocket: WebSocket):
                 continue
 
             await websocket.send_text(json.dumps({
-                "type": "rag_response",
+                "type": "direct_response" if mode == "direct" else "rag_response",
                 "query": question,
                 "answer":   str(response),
             }))

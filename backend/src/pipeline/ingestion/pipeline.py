@@ -22,22 +22,40 @@ def run_ingestion_pipeline(
         # 1️⃣ Load Data
         reader = Reader(file_path)
         documents = reader.load()
+        
+        doc_count = len(documents)
 
         yield json.dumps({
-            "msg": f"Successfully loaded {len(documents)} document(s)",
+            "msg": f"Successfully loaded {doc_count} document(s)",
             "level": "info"
         }) + "\n"
-        print(f"Successfully loaded {len(documents)} document(s).")
+        
+        # Send document count as metadata for UI stats
+        yield json.dumps({
+            "msg": f"Documents loaded: {doc_count}",
+            "level": "info",
+            "documents": doc_count
+        }) + "\n"
+        print(f"Successfully loaded {doc_count} document(s).")
 
         # 2️⃣ Chunk Data
         chunker = Chunking(chunking_request=chunking)
         nodes = chunker.split(documents)
+        
+        chunk_count = len(nodes)
 
         yield json.dumps({
-            "msg": f"Split documents into {len(nodes)} nodes",
+            "msg": f"Split documents into {chunk_count} nodes",
             "level": "info"
         }) + "\n"
-        print(f"Split documents into {len(nodes)} nodes.")
+        
+        # Send chunk count as metadata for UI stats
+        yield json.dumps({
+            "msg": f"Chunks created: {chunk_count}",
+            "level": "info",
+            "chunks": chunk_count
+        }) + "\n"
+        print(f"Split documents into {chunk_count} nodes.")
 
         # 3️⃣ Vector DB ingestion
         db_type = vectordb.vectordb_type

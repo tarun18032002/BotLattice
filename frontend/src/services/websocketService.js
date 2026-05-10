@@ -2,14 +2,14 @@
  * src/services/websocketService.js
  *
  * Manages the WebSocket connection to the BotLattice FastAPI backend.
- * Endpoint: ws://localhost:8000/ws/chat
+ * Endpoint: ws://127.0.0.1:8000/ws/chat
  *
  * Protocol (matches your FastAPI router):
- *   SEND:    { question: string, collection_name: string }
+ *   SEND:    { question: string, collection_name: string, top_k?: number, retrieval_settings?: object }
  *   RECEIVE: { question: string, answer: string }
  */
 
-const WS_URL = import.meta.env.VITE_WS_URL ?? "ws://localhost:8000/ws/chat";
+const WS_URL = import.meta.env.VITE_WS_URL ?? "ws://127.0.0.1:8000/ws/chat";
 
 // ── Connection states ─────────────────────────────────────────────────────────
 export const WS_STATE = {
@@ -66,14 +66,19 @@ class WebSocketManager {
    * Send a RAG chat message to the backend.
    * @param {string} question        - The user's question
    * @param {string} collection_name - Active collection name (defaults to 'resume')
+   * @param {object} options         - Optional query overrides
    * @returns {boolean}              - false if socket not open
    */
-  send(question, collection_name = "resume") {
+  send(question, collection_name = "resume", options = {}) {
     if (!this._socket || this._socket.readyState !== WebSocket.OPEN) {
       console.warn("[WS] Socket not open. State:", this._socket?.readyState, "Expected:", WebSocket.OPEN);
       return false;
     }
-    const payload = { question, collection_name };
+    const payload = {
+      question,
+      collection_name,
+      ...(options || {}),
+    };
     console.log("[WS] Sending RAG query:", payload);
     this._socket.send(JSON.stringify(payload));
     return true;

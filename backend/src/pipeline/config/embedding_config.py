@@ -26,6 +26,7 @@ class EmbeddingConfig:
     normalize: bool = False
     cache: bool = False
     connected: bool = False
+    dimension: int = 0  # Extracted from actual embedding model
 
     def save(self) -> None:
         """Write current state to disk."""

@@ -10,42 +10,16 @@ from src.api.websocket_chat import router as ws_router
 from src.api.routes_chunking import router as chunking_router
 from src.api.routes_vectordb import router as vectordb_router
 from src.api.routes_embeddings import router as embeddings_router
+from src.api.routes_settings import router as settings_router
 
 from fastapi.middleware.cors import CORSMiddleware
 import src.pipeline.config.settings
-
-
-def _restore_embed_model():
-    """Re-instantiate Settings.embed_model from persisted config on startup."""
-    from src.pipeline.config.embedding_config import active_embedding
-    from src.pipeline.config.embedding_factory import create_embed_model
-    from llama_index.core import Settings
-
-    if not active_embedding.connected:
-        return
-
-    try:
-        provider = active_embedding.provider
-        model    = active_embedding.model
-        api_key  = active_embedding.api_key
-
-        Settings.embed_model = create_embed_model(
-            provider=provider,
-            model=model,
-            api_key=api_key,
-            batch_size=active_embedding.batch_size,
-            normalize=active_embedding.normalize,
-            cache=active_embedding.cache,
-        )
-
-        print(f"[startup] Restored embed model: {provider}/{model}")
-    except Exception as exc:
-        print(f"[startup] Could not restore embed model: {exc}")
+from src.pipeline.config.embedding_runtime import warm_embed_model_in_background
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    _restore_embed_model()
+    warm_embed_model_in_background()
     yield
 
 
@@ -61,8 +35,9 @@ app.add_middleware(
 )
 
 app.include_router(ingest_router)
-app.include_router(query_router)
-app.include_router(ws_router)
 app.include_router(chunking_router)
 app.include_router(vectordb_router)
 app.include_router(embeddings_router)
+app.include_router(settings_router)
+app.include_router(query_router)
+app.include_router(ws_router)

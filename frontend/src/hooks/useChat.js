@@ -5,7 +5,7 @@
  *
  * Flow:
  *   1. On mount   → wsManager.connect()
- *   2. On send    → wsManager.send(question, collection_name)
+ *   2. On send    → wsManager.send(question, collection_name, queryOptions)
  *   3. On reply   → append assistant message from WebSocket response
  *   4. On unmount → wsManager.disconnect()
  */
@@ -110,11 +110,13 @@ export function useChat() {
           return;
         }
 
-        // RAG response or legacy format
-        if (msgType === "rag_response" || !msgType) {
-          console.log("[CHAT] Processing RAG response");
+        // RAG/direct response or legacy format
+        if (msgType === "rag_response" || msgType === "direct_response" || !msgType) {
+          console.log("[CHAT] Processing chat response", msgType);
           const sources = settings.showSources
-            ? (Array.isArray(data.sources) && data.sources.length > 0
+            ? (msgType === "direct_response"
+                ? []
+                : Array.isArray(data.sources) && data.sources.length > 0
                 ? data.sources
                 : collection ? buildFakeSources(collection, collections) : [])
             : [];
@@ -195,8 +197,13 @@ export function useChat() {
         thread_id:       threadIdRef.current || undefined,
       });
     } else {
-      console.log("[CHAT] Sending RAG query with collection:", collection);
-      sent = wsManager.send(text, collection || "resume");
+      console.log("[CHAT] Sending chat query", { mode, collection });
+      sent = wsManager.send(text, collection || "resume", {
+        mode,
+        system_prompt: settings.systemPrompt,
+        top_k: topK,
+        retrieval_settings: settings,
+      });
     }
 
     if (!sent) {
@@ -212,7 +219,7 @@ export function useChat() {
         },
       ]);
     }
-  }, [input, thinking, collection, mode, wsState]);
+  }, [input, thinking, collection, mode, wsState, topK, agent, settings]);
 
   const clearChat = useCallback(() => {
     setMessages([]);

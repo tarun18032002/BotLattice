@@ -149,6 +149,14 @@ def connect_embeddings(
     active_embedding.normalize  = normalize
     active_embedding.cache      = cache
     active_embedding.connected  = True
+    
+    # Extract actual dimension from the loaded embed model
+    try:
+        active_embedding.dimension = embed_model.embed_dim
+    except Exception as exc:
+        print(f"Warning: Could not extract dimension from embed model: {exc}")
+        active_embedding.dimension = 384  # fallback
+    
     active_embedding.save()  # write to embedding_state.json
 
     return {
@@ -158,5 +166,6 @@ def connect_embeddings(
         "batch_size": batch_size,
         "normalize": normalize,
         "cache": cache,
+        "dimension": active_embedding.dimension,
     }
 

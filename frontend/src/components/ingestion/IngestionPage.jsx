@@ -48,13 +48,19 @@ export function IngestionPage() {
     stats,
   } = useIngestion();
 
-  const { collections, loading } = useCollections();
+  const { collections, loading, refresh: refreshCollections } = useCollections();
 
   // Helper to determine if we can run the pipeline
   const isRunDisabled = 
     running || 
     files.length === 0 || 
     !ingestion.collectionName;
+  
+  // Refresh collections after successful ingestion
+  const handleIngestionComplete = async () => {
+    await run();
+    setTimeout(() => refreshCollections(), 500);
+  };
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -70,7 +76,7 @@ export function IngestionPage() {
             <Button
               variant="primary"
               size="md"
-              onClick={run}
+              onClick={handleIngestionComplete}
               disabled={isRunDisabled}
               icon={running ? <SpinnerIcon size={12} /> : <ZapIcon />}
             >

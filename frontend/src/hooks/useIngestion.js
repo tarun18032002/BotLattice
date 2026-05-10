@@ -67,7 +67,7 @@ export function useIngestion() {
   const { fields: chunkingFields } = useChunkingOptions(ingestion.chunkStrategy);
 
   const addLog = (msg, level = "info") => {
-    setLogs((prev) => [...prev, { msg, level }]);
+    setLogs((prev) => [...prev, { msg, level, ts: new Date().toLocaleTimeString() }]);
   };
 
   const addFiles = (newFiles) => {
@@ -310,9 +310,13 @@ export function useIngestion() {
 
     setRunning(true);
     setLogs([]);
+    setStats((prev) => ({ ...prev, docs: 0, chunks: 0, embeddings: 0, time: "-" }));
 
     try {
       addLog("Starting ingestion pipeline...");
+
+      let observedDocs = 0;
+      let observedChunks = 0;
 
       const chunking = buildChunking(ingestion, chunkingFields);
 
@@ -323,19 +327,42 @@ export function useIngestion() {
         tags: ingestion.Tags || ""
       };
 
-      const { chunks } = await runIngestionPipeline(
+      const { chunks, documents } = await runIngestionPipeline(
         chunking,
         collection,
         files,
-        (msg, level = "info") => addLog(msg, level)
+        (msg, level = "info", parsed = null) => {
+          addLog(msg, level);
+
+          const parsedDocs = Number(parsed?.documents);
+          const parsedChunks = Number(parsed?.chunks);
+
+          const hasDocs = Number.isFinite(parsedDocs) && parsedDocs >= 0;
+          const hasChunks = Number.isFinite(parsedChunks) && parsedChunks >= 0;
+
+          if (hasDocs) observedDocs = parsedDocs;
+          if (hasChunks) observedChunks = parsedChunks;
+
+          if (hasDocs || hasChunks) {
+            setStats((prev) => ({
+              ...prev,
+              docs: hasDocs ? parsedDocs : prev.docs,
+              chunks: hasChunks ? parsedChunks : prev.chunks,
+              embeddings: hasChunks ? parsedChunks : prev.embeddings,
+            }));
+          }
+        }
       );
 
       addLog("Pipeline finished successfully", "success");
 
+      const finalDocs = documents > 0 ? documents : (observedDocs > 0 ? observedDocs : files.length);
+      const finalChunks = chunks > 0 ? chunks : observedChunks;
+
       setStats({
-        chunks,
-        embeddings: chunks,
-        docs: files.length,
+        chunks: finalChunks,
+        embeddings: finalChunks,
+        docs: finalDocs,
         time: new Date().toLocaleTimeString()
       });
 

@@ -1,5 +1,7 @@
+const API_BASE_URL = "http://127.0.0.1:8000";
+
 export async function fetchEmbeddingProviders() {
-  const res = await fetch("http://127.0.0.1:8000/embeddings/providers/");
+  const res = await fetch(`${API_BASE_URL}/embeddings/providers/`);
   if (!res.ok) {
     throw new Error("Failed to fetch embedding providers");
   }
@@ -24,7 +26,7 @@ export async function fetchEmbeddingProviders() {
 }
 
 export async function fetchCurrentEmbedding() {
-  const res = await fetch("http://127.0.0.1:8000/embeddings/current/");
+  const res = await fetch(`${API_BASE_URL}/embeddings/current/`);
 
   if (res.status === 404) {
     return null;
@@ -47,7 +49,7 @@ export async function connectEmbedding(payload) {
   if (payload.normalize !== undefined) params.set("normalize", String(Boolean(payload.normalize)));
   if (payload.cache !== undefined) params.set("cache", String(Boolean(payload.cache)));
 
-  const res = await fetch(`http://127.0.0.1:8000/embeddings/connect/?${params.toString()}`, {
+  const res = await fetch(`${API_BASE_URL}/embeddings/connect/?${params.toString()}`, {
     method: "POST",
   });
 

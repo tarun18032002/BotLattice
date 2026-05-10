@@ -1,5 +1,7 @@
+const API_BASE_URL = "http://127.0.0.1:8000";
+
 export async function fetchChunkingOptions(type) {
-  const res = await fetch(`http://localhost:8000/chunking/options/${type}`,{
+  const res = await fetch(`${API_BASE_URL}/chunking/options/${type}`,{
     method: 'GET',
   }
   );

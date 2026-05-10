@@ -1,5 +1,7 @@
+const API_BASE_URL = "http://127.0.0.1:8000";
+
 export async function fetchVectordbOptions(type) {
-  const res = await fetch(`http://localhost:8000/vector-db/options/${type}`,{
+  const res = await fetch(`${API_BASE_URL}/vector-db/options/${type}`,{
     method: 'GET',
   }
   );
@@ -38,7 +40,7 @@ function normalizeCollection(item) {
 }
 
 export async function fetchCollections() {
-  const res = await fetch("http://127.0.0.1:8000/vector-db/collections", {
+  const res = await fetch(`${API_BASE_URL}/vector-db/collections`, {
     method: "GET",
   });
 
@@ -55,7 +57,7 @@ export async function fetchCollections() {
 }
 
 export async function fetchVectordbProviders() {
-  const res = await fetch("http://127.0.0.1:8000/vector-db/providers/");
+  const res = await fetch(`${API_BASE_URL}/vector-db/providers/`);
   if (!res.ok) {
     throw new Error("Failed to fetch vector DB providers");
   }
@@ -70,7 +72,7 @@ export async function fetchVectordbProviders() {
 }
 
 export async function fetchCurrentVectordb() {
-  const res = await fetch("http://127.0.0.1:8000/vector-db/current/");
+  const res = await fetch(`${API_BASE_URL}/vector-db/current/`);
 
   if (res.status === 404) {
     return null;
@@ -84,7 +86,7 @@ export async function fetchCurrentVectordb() {
 }
 
 export async function deleteCollection(name) {
-  const res = await fetch(`http://127.0.0.1:8000/vector-db/collections/${encodeURIComponent(name)}`, {
+  const res = await fetch(`${API_BASE_URL}/vector-db/collections/${encodeURIComponent(name)}`, {
     method: "DELETE",
   });
   const data = await res.json().catch(() => ({}));
@@ -93,7 +95,7 @@ export async function deleteCollection(name) {
 }
 
 export async function fetchCollectionDetail(name) {
-  const res = await fetch(`http://127.0.0.1:8000/vector-db/collections/${encodeURIComponent(name)}`);
+  const res = await fetch(`${API_BASE_URL}/vector-db/collections/${encodeURIComponent(name)}`);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.detail || "Failed to fetch collection detail");
   return normalizeCollection(data);
@@ -108,7 +110,7 @@ export async function connectVectordb(payload) {
   if (payload.hybridSearch !== undefined) params.set("hybrid_search", String(Boolean(payload.hybridSearch)));
   if (payload.storeMeta !== undefined) params.set("store_meta", String(Boolean(payload.storeMeta)));
 
-  const res = await fetch(`http://127.0.0.1:8000/vector-db/connect/?${params.toString()}`, {
+  const res = await fetch(`${API_BASE_URL}/vector-db/connect/?${params.toString()}`, {
     method: "POST",
   });
 

@@ -1,12 +1,10 @@
 const API_BASE_URL = "http://127.0.0.1:8000";
+import { getJson, invalidateGetCache } from "./httpCache";
 
 export async function fetchEmbeddingProviders() {
-  const res = await fetch(`${API_BASE_URL}/embeddings/providers/`);
-  if (!res.ok) {
-    throw new Error("Failed to fetch embedding providers");
-  }
-
-  const data = await res.json();
+  const data = await getJson(`${API_BASE_URL}/embeddings/providers/`, {
+    errorMessage: "Failed to fetch embedding providers",
+  });
   return Object.entries(data).map(([provider, value]) => {
     // Backward compatibility: value may be a plain model array.
     if (Array.isArray(value)) {
@@ -26,17 +24,16 @@ export async function fetchEmbeddingProviders() {
 }
 
 export async function fetchCurrentEmbedding() {
-  const res = await fetch(`${API_BASE_URL}/embeddings/current/`);
-
-  if (res.status === 404) {
-    return null;
+  try {
+    return await getJson(`${API_BASE_URL}/embeddings/current/`, {
+      errorMessage: "Failed to fetch current embedding config",
+    });
+  } catch (err) {
+    if (err?.status === 404) {
+      return null;
+    }
+    throw err;
   }
-
-  if (!res.ok) {
-    throw new Error("Failed to fetch current embedding config");
-  }
-
-  return res.json();
 }
 
 export async function connectEmbedding(payload) {
@@ -59,6 +56,8 @@ export async function connectEmbedding(payload) {
     const message = data?.detail || "Failed to connect embedding model";
     throw new Error(message);
   }
+
+  invalidateGetCache("/embeddings/");
 
   return data;
 }

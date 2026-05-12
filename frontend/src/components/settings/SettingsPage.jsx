@@ -5,7 +5,7 @@ import { LLMSettings }         from "./LLMSettings";
 import { RetrievalSettings }   from "./RetrievalSettings";
 import { SystemPromptEditor }  from "./SystemPromptEditor";
 import { Button }              from "../ui/Primitives";
-import { fetchCurrentSettings, saveSettings } from "../../api/settings";
+import { fetchCurrentSettings, fetchSettingsOptions, saveSettings } from "../../api/settings";
 
 export function SettingsPage() {
   const { state, dispatch } = useStore();
@@ -13,6 +13,7 @@ export function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(true);
+  const [llmProviderMeta, setLlmProviderMeta] = useState(null);
 
   const updateSettings = (patch) =>
     dispatch({ type: "UPDATE_SETTINGS", payload: patch });
@@ -20,7 +21,15 @@ export function SettingsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const serverSettings = await fetchCurrentSettings();
+        const [serverSettings, serverOptions] = await Promise.all([
+          fetchCurrentSettings(),
+          fetchSettingsOptions(),
+        ]);
+
+        if (serverOptions?.llm_providers && typeof serverOptions.llm_providers === "object") {
+          setLlmProviderMeta(serverOptions.llm_providers);
+        }
+
         dispatch({ type: "UPDATE_SETTINGS", payload: serverSettings });
       } catch (err) {
         setStatus(err?.message || "Failed to load settings");
@@ -69,6 +78,7 @@ export function SettingsPage() {
           <LLMSettings
             settings={settings}
             onChange={updateSettings}
+            providerMeta={llmProviderMeta}
           />
           <RetrievalSettings
             settings={settings}

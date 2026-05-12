@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useStore } from "../../store/useStore";
+import { logout } from "../../api/auth";
 import { UploadIcon, ChatIcon, DatabaseIcon, SettingsIcon } from "../ui/Icons";
 import { fetchCurrentEmbedding } from "../../api/embeddings";
 import { fetchCollections, fetchCurrentVectordb } from "../../api/vectordb";
@@ -13,12 +14,22 @@ const NAV_ITEMS = [
 
 export function Sidebar() {
   const { state, dispatch } = useStore();
-  const { page, ingestion, collections } = state;
+  const { page, ingestion, collections, auth } = state;
   const [activeCollection, setActiveCollection] = useState("—");
   const [activeEmbedder, setActiveEmbedder] = useState("—");
   const [activeVectorDb, setActiveVectorDb] = useState("—");
 
   const setPage = (id) => dispatch({ type: "SET_PAGE", payload: id });
+
+  const handleLogout = async () => {
+    try {
+      await logout(auth.token);
+    } catch {
+      // No-op: local auth state is source of truth for immediate UI logout.
+    } finally {
+      dispatch({ type: "CLEAR_AUTH" });
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -130,6 +141,18 @@ export function Sidebar() {
             <span className="text-[10px] text-[#8892a4] font-medium truncate max-w-[100px] text-right">{v}</span>
           </div>
         ))}
+      </div>
+
+      <div className="m-2 p-3 rounded-[10px] bg-[#0d1018] border border-[rgba(255,255,255,0.06)]">
+        <div className="text-[9px] text-[#4d5669] uppercase tracking-[0.12em] mb-2">Signed in</div>
+        <div className="text-[12px] text-[#c8cfdd] truncate">{auth.user?.name || "User"}</div>
+        <div className="text-[10px] text-[#8892a4] truncate mb-3">{auth.user?.email || "-"}</div>
+        <button
+          onClick={handleLogout}
+          className="w-full rounded-lg border border-[rgba(255,255,255,0.12)] text-[#c8cfdd] hover:text-[#e8eaf0] hover:bg-white/5 text-[11px] px-2 py-1.5"
+        >
+          Logout
+        </button>
       </div>
     </aside>
   );

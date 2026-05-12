@@ -2,9 +2,22 @@ import { LLM_PROVIDERS, LLM_MODELS } from "../../constants/pipeline";
 import { Input, Select, RangeInput } from "../ui/FormControls";
 import { Card, SectionTitle } from "../ui/Primitives";
 
-export function LLMSettings({ settings, onChange }) {
+export function LLMSettings({ settings, onChange, providerMeta }) {
+  const providers = providerMeta
+    ? Object.entries(providerMeta).map(([value, meta]) => ({
+        value,
+        label: meta?.label || value[0].toUpperCase() + value.slice(1),
+      }))
+    : LLM_PROVIDERS;
+
+  const modelsByProvider = providerMeta
+    ? Object.fromEntries(
+        Object.entries(providerMeta).map(([provider, meta]) => [provider, meta?.models || []])
+      )
+    : LLM_MODELS;
+
   const handleProviderChange = (provider) => {
-    const models = LLM_MODELS[provider] ?? [];
+    const models = modelsByProvider[provider] ?? [];
     onChange({ llmProvider: provider, llmModel: models[0] ?? "" });
   };
 
@@ -14,13 +27,13 @@ export function LLMSettings({ settings, onChange }) {
       <div className="space-y-3">
         <Select
           label="Provider"
-          options={LLM_PROVIDERS}
+          options={providers}
           value={settings.llmProvider}
           onChange={(e) => handleProviderChange(e.target.value)}
         />
         <Select
           label="Model"
-          options={LLM_MODELS[settings.llmProvider] ?? []}
+          options={modelsByProvider[settings.llmProvider] ?? []}
           value={settings.llmModel}
           onChange={(e) => onChange({ llmModel: e.target.value })}
         />

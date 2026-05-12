@@ -1,15 +1,16 @@
 const API_BASE_URL = "http://127.0.0.1:8000";
+import { getJson, invalidateGetCache } from "./httpCache";
 
 export async function fetchCurrentSettings() {
-  const res = await fetch(`${API_BASE_URL}/settings/current/`, {
-    method: "GET",
+  return getJson(`${API_BASE_URL}/settings/current/`, {
+    errorMessage: "Failed to fetch current settings",
   });
+}
 
-  if (!res.ok) {
-    throw new Error("Failed to fetch current settings");
-  }
-
-  return res.json();
+export async function fetchSettingsOptions() {
+  return getJson(`${API_BASE_URL}/settings/options/`, {
+    errorMessage: "Failed to fetch settings options",
+  });
 }
 
 export async function saveSettings(payload) {
@@ -26,6 +27,8 @@ export async function saveSettings(payload) {
     const detail = data?.detail || "Failed to save settings";
     throw new Error(detail);
   }
+
+  invalidateGetCache("/settings/");
 
   return data;
 }

@@ -1,16 +1,10 @@
 const API_BASE_URL = "http://127.0.0.1:8000";
+import { getJson, invalidateGetCache } from "./httpCache";
 
 export async function fetchVectordbOptions(type) {
-  const res = await fetch(`${API_BASE_URL}/vector-db/options/${type}`,{
-    method: 'GET',
-  }
-  );
-
-  if (!res.ok) {
-    throw new Error("Failed to fetch chunking options");
-  }
-
-  return res.json();
+  return getJson(`${API_BASE_URL}/vector-db/options/${type}`, {
+    errorMessage: "Failed to fetch chunking options",
+  });
 }
 
 function toNumber(value, fallback = 0) {
@@ -40,15 +34,9 @@ function normalizeCollection(item) {
 }
 
 export async function fetchCollections() {
-  const res = await fetch(`${API_BASE_URL}/vector-db/collections`, {
-    method: "GET",
+  const data = await getJson(`${API_BASE_URL}/vector-db/collections`, {
+    errorMessage: "Failed to fetch vector database collections",
   });
-
-  if (!res.ok) {
-    throw new Error("Failed to fetch vector database collections");
-  }
-
-  const data = await res.json();
   const rawCollections = Array.isArray(data.collections) ? data.collections : [];
 
   return rawCollections
@@ -57,12 +45,9 @@ export async function fetchCollections() {
 }
 
 export async function fetchVectordbProviders() {
-  const res = await fetch(`${API_BASE_URL}/vector-db/providers/`);
-  if (!res.ok) {
-    throw new Error("Failed to fetch vector DB providers");
-  }
-
-  const data = await res.json();
+  const data = await getJson(`${API_BASE_URL}/vector-db/providers/`, {
+    errorMessage: "Failed to fetch vector DB providers",
+  });
   return Object.entries(data).map(([db, meta]) => ({
     db,
     requiresApiKey: Boolean(meta?.requires_api_key),
@@ -72,17 +57,16 @@ export async function fetchVectordbProviders() {
 }
 
 export async function fetchCurrentVectordb() {
-  const res = await fetch(`${API_BASE_URL}/vector-db/current/`);
-
-  if (res.status === 404) {
-    return null;
+  try {
+    return await getJson(`${API_BASE_URL}/vector-db/current/`, {
+      errorMessage: "Failed to fetch current vector DB config",
+    });
+  } catch (err) {
+    if (err?.status === 404) {
+      return null;
+    }
+    throw err;
   }
-
-  if (!res.ok) {
-    throw new Error("Failed to fetch current vector DB config");
-  }
-
-  return res.json();
 }
 
 export async function deleteCollection(name) {
@@ -95,9 +79,9 @@ export async function deleteCollection(name) {
 }
 
 export async function fetchCollectionDetail(name) {
-  const res = await fetch(`${API_BASE_URL}/vector-db/collections/${encodeURIComponent(name)}`);
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.detail || "Failed to fetch collection detail");
+  const data = await getJson(`${API_BASE_URL}/vector-db/collections/${encodeURIComponent(name)}`, {
+    errorMessage: "Failed to fetch collection detail",
+  });
   return normalizeCollection(data);
 }
 
@@ -119,6 +103,8 @@ export async function connectVectordb(payload) {
   if (!res.ok) {
     throw new Error(data?.detail || "Failed to connect vector DB");
   }
+
+  invalidateGetCache("/vector-db/");
 
   return data;
 }

@@ -4,31 +4,20 @@ from fastapi import APIRouter, HTTPException
 from typing import Optional
 
 from llama_index.core import Settings
+from src.database.option_catalog import get_option
 from src.pipeline.config.embedding_config import active_embedding
 from src.pipeline.config.embedding_factory import create_embed_model
 
 router = APIRouter()
 
-# Single source of truth — used by both GET and POST
-PROVIDERS = {
-    "huggingface": {
-        "models": ["all-MiniLM-L6-v2", "all-mpnet-base-v2", "BAAI/bge-small-en-v1.5"],
-        "requires_api_key": False,
-    },
-    "google": {
-        "models": ["gemini-embedding-2-preview"],
-        "requires_api_key": True,
-    },
-    "openai": {
-        "models": ["text-embedding-3-small", "text-embedding-3-large"],
-        "requires_api_key": True,
-    },
-}
+def _providers() -> dict:
+    providers = get_option("embedding_providers", fallback={})
+    return providers if isinstance(providers, dict) else {}
 
 
 @router.get("/embeddings/providers/")
 def get_embedding_providers():
-    return PROVIDERS
+    return _providers()
 
 
 @router.get("/embeddings/current/")
@@ -55,13 +44,15 @@ def connect_embeddings(
     cache: Optional[bool] = False,
 ):
     # ── 1. Validate provider ──────────────────────────────────────────────────
-    if provider not in PROVIDERS:
+    providers = _providers()
+
+    if provider not in providers:
         raise HTTPException(
             status_code=400,
-            detail=f"Unknown provider '{provider}'. Choose from: {list(PROVIDERS.keys())}",
+            detail=f"Unknown provider '{provider}'. Choose from: {list(providers.keys())}",
         )
 
-    provider_info = PROVIDERS[provider]
+    provider_info = providers[provider]
     effective_api_key = api_key
 
     # Reuse previously saved API key for the same provider so users are not

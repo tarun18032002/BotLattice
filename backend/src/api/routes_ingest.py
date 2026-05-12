@@ -5,11 +5,16 @@ import logging
 import json
 import os
 import tempfile
+from fastapi import FastAPI, Depends
+from sqlalchemy.orm import Session
 
 from src.pipeline.config  import settings
 from src.pipeline.ingestion.pipeline import run_ingestion_pipeline
 from src.logger.logging import StreamLogHandler
 from src.pipeline.config.schemas import ChunkingRequest,CollectionRequest
+
+# db connection import 
+from src.database import get_db
 
 
 router = APIRouter()
@@ -20,6 +25,7 @@ async def ingest_file(
     file: UploadFile = File(...),
     chunking: str = Form(...),
     collection:str = Form(...),
+    db: Session = Depends(get_db)
 
 ):
     try:

@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from typing import Optional
 import qdrant_client
 
+from src.database.option_catalog import get_option
 from src.pipeline.config.vectordb_config import VECTORDB_OPTIONS
 from src.pipeline.config.schemas import VectorDBType
 from src.pipeline.config.vector_store import VectorDBFactory
@@ -10,18 +11,9 @@ from src.pipeline.config.vectordb_state import active_vectordb
 
 router = APIRouter()
 
-VECTORDB_PROVIDERS = {
-    "qdrant": {
-        "requires_api_key": False,
-        "show_api_key": True,
-        "url_placeholder": "http://localhost:6333",
-        "supports": {
-            "distance_metric": True,
-            "hybrid_search": True,
-            "store_meta": True,
-        },
-    }
-}
+def _vectordb_providers() -> dict:
+    providers = get_option("vectordb_providers", fallback={})
+    return providers if isinstance(providers, dict) else {}
 
 
 @router.get("/vector-db/options/{chunking_type}")
@@ -110,7 +102,7 @@ def delete_collection(collection_name: str):
 
 @router.get("/vector-db/providers/")
 def get_vectordb_providers():
-    return VECTORDB_PROVIDERS
+    return _vectordb_providers()
 
 
 @router.get("/vector-db/current/")
@@ -141,13 +133,15 @@ def connect_vector_db(
 ):
     provider_key = vectordb_type.value
 
-    if provider_key not in VECTORDB_PROVIDERS:
+    providers = _vectordb_providers()
+
+    if provider_key not in providers:
         raise HTTPException(
             status_code=400,
             detail=f"Unsupported vector DB '{provider_key}'.",
         )
 
-    provider_info = VECTORDB_PROVIDERS[provider_key]
+    provider_info = providers[provider_key]
     effective_url = url or active_vectordb.url or provider_info["url_placeholder"]
     effective_api_key = api_key
 

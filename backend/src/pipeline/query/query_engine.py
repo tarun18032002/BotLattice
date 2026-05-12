@@ -74,7 +74,7 @@ def build_query_engine(retriever, retrieval_settings=None, top_k=None):
     response_synthesizer = get_response_synthesizer(
         text_qa_template=qa_prompt,
         streaming=stream_responses,
-        max_tokens=max_tokens,
+       
     )
 
     # -------------------------------

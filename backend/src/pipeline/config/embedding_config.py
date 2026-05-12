@@ -1,20 +1,30 @@
-"""
-Active embedding configuration — persisted to disk.
+"""Active embedding configuration persisted in PostgreSQL."""
 
-Set by POST /embeddings/connect/.
-Loaded automatically on import so config survives server restarts.
-
-Other modules consume it as:
-    from src.pipeline.config.embedding_config import active_embedding
-"""
-
+from dataclasses import dataclass
 import json
 from pathlib import Path
-from dataclasses import dataclass, asdict
 from typing import Optional
 
-# Stored next to this file so the path is always predictable
-_CONFIG_FILE = Path(__file__).parent / "embedding_state.json"
+from src.database.db import Base, SessionLocal, engine
+from src.database.models import EmbeddingState as EmbeddingStateModel
+
+_LEGACY_CONFIG_FILE = Path(__file__).parent / "embedding_state.json"
+
+
+def _ensure_tables() -> None:
+    Base.metadata.create_all(bind=engine)
+
+
+def _load_legacy_json() -> "EmbeddingConfig | None":
+    if not _LEGACY_CONFIG_FILE.exists():
+        return None
+
+    try:
+        data = json.loads(_LEGACY_CONFIG_FILE.read_text(encoding="utf-8"))
+        allowed = {k: v for k, v in data.items() if k in EmbeddingConfig.__dataclass_fields__}
+        return EmbeddingConfig(**allowed)
+    except Exception:
+        return None
 
 
 @dataclass
@@ -29,23 +39,55 @@ class EmbeddingConfig:
     dimension: int = 0  # Extracted from actual embedding model
 
     def save(self) -> None:
-        """Write current state to disk."""
-        _CONFIG_FILE.write_text(
-            json.dumps(asdict(self), indent=2),
-            encoding="utf-8",
-        )
+        _ensure_tables()
+        db = SessionLocal()
+        try:
+            row = db.query(EmbeddingStateModel).filter(EmbeddingStateModel.id == 1).first()
+            if row is None:
+                row = EmbeddingStateModel(id=1)
+                db.add(row)
+
+            row.provider = self.provider
+            row.model = self.model
+            row.api_key = self.api_key
+            row.batch_size = self.batch_size
+            row.normalize = self.normalize
+            row.cache = self.cache
+            row.connected = self.connected
+            row.dimension = self.dimension
+
+            db.commit()
+        finally:
+            db.close()
 
     @classmethod
     def load(cls) -> "EmbeddingConfig":
-        """Load state from disk; return defaults if file is missing or corrupt."""
-        if not _CONFIG_FILE.exists():
-            return cls()
+        _ensure_tables()
+        db = SessionLocal()
         try:
-            data = json.loads(_CONFIG_FILE.read_text(encoding="utf-8"))
-            return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
+            row = db.query(EmbeddingStateModel).filter(EmbeddingStateModel.id == 1).first()
+            if row is None:
+                legacy_state = _load_legacy_json()
+                if legacy_state is not None:
+                    legacy_state.save()
+                    return legacy_state
+                return cls()
+
+            return cls(
+                provider=row.provider or "",
+                model=row.model or "",
+                api_key=row.api_key,
+                batch_size=row.batch_size or 512,
+                normalize=bool(row.normalize),
+                cache=bool(row.cache),
+                connected=bool(row.connected),
+                dimension=row.dimension or 0,
+            )
         except Exception:
             return cls()
+        finally:
+            db.close()
 
 
-# Module-level singleton — loaded from disk on first import
+# Module-level singleton — loaded from PostgreSQL on first import
 active_embedding = EmbeddingConfig.load()

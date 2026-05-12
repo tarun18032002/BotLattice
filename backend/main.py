@@ -11,6 +11,7 @@ from src.api.routes_chunking import router as chunking_router
 from src.api.routes_vectordb import router as vectordb_router
 from src.api.routes_embeddings import router as embeddings_router
 from src.api.routes_settings import router as settings_router
+from src.api.routes_auth import router as auth_router
 
 from fastapi.middleware.cors import CORSMiddleware
 import src.pipeline.config.settings
@@ -39,5 +40,6 @@ app.include_router(chunking_router)
 app.include_router(vectordb_router)
 app.include_router(embeddings_router)
 app.include_router(settings_router)
+app.include_router(auth_router)
 app.include_router(query_router)
 app.include_router(ws_router)

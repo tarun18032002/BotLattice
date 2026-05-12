@@ -2,6 +2,14 @@ FROM ghcr.io/astral-sh/uv:python3.14-bookworm-slim
 
 WORKDIR /app
 
+# Needed for native extensions pulled by fastembed (py-rust-stemmers).
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends build-essential \
+	&& rm -rf /var/lib/apt/lists/*
+
+ENV CC=gcc
+ENV CXX=g++
+
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 

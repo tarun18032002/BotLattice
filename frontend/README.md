@@ -1,26 +1,51 @@
-# React + Vite
+# Frontend (React + Vite)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Frontend UI for ingestion, collections, settings, and chat.
 
-Currently, two official plugins are available:
+## Prerequisites
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Node.js 20+
+- npm 10+
 
-## React Compiler
+## Setup
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+cd frontend
+npm install
+```
 
-## Expanding the ESLint configuration
+Create `frontend/.env` (or copy from `.env.example`) and set:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```env
+VITE_WS_URL=ws://localhost:8000/ws/chat
+VITE_GOOGLE_CLIENT_ID=your-google-oauth-web-client-id.apps.googleusercontent.com
+```
 
-## Google Auth Setup
+## Run
 
-To enable Google Sign-In in the auth page:
+```bash
+npm run dev
+```
 
-1. Create a Google OAuth Web Client ID in Google Cloud Console.
-2. In frontend env, set `VITE_GOOGLE_CLIENT_ID`.
-3. In backend env, set `GOOGLE_CLIENT_ID` to the same value.
+App runs at `http://localhost:5173`.
 
-You can copy `frontend/.env.example` to `.env` and fill the value.
+## Build
+
+```bash
+npm run build
+npm run preview
+```
+
+## Main Areas
+
+- Auth: email/password and Google sign-in
+- Ingestion: dynamic chunking form and collection mode support
+- Collections: list and inspect vector DB collections
+- Settings: provider/model/retrieval configuration
+- Chat: websocket-based response stream
+
+## Troubleshooting
+
+- If API requests fail, verify backend is running on `http://localhost:8000`.
+- If Google login fails, ensure `VITE_GOOGLE_CLIENT_ID` matches backend `GOOGLE_CLIENT_ID`.
+- If websocket chat fails, confirm `VITE_WS_URL` points to the active backend endpoint.

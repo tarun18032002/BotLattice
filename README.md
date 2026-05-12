@@ -1,60 +1,75 @@
-git commit -m  "fix: fix ingest pipeline — API contract, chunking payload, and Replace mode
+# RAG SDK
 
-Backend:
-- Add GET /chunking/options/{type} endpoint to expose per-strategy field schema
-- Add GET /vectordb/collections endpoint
-- Fix pipeline.py: wrong attribute names (CollectionName → collection_name, Mode → mode)
-- Fix vector_store.py: implement missing _delete_collection for Replace_existing mode
-- Fix vector_store.py: f-string syntax error (nested double quotes)
-- Fix chunking_config.py: add missing 'simple' strategy entry
-- Add CollectionMode enum and CollectionRequest schema
-- Extend ChunkingType enum with all supported strategies
+Full-stack Retrieval-Augmented Generation (RAG) workspace with:
 
-Frontend:
-- Fix useIngestion.js: was passing nested apiConfig to service causing
-  chunking_type: undefined → backend 400; now builds chunking payload
-  dynamically using only fields declared by GET /chunking/options/{type}
-- Fix useIngestion.js: collectionMode initial value "append" → "Append_to_existing"
-- Fix ingestionService.js: update signature to accept pre-built chunking
-  and collection objects; append as separate form fields matching backend
-- Add useChunkingOptions hook: fetches field schema from backend on strategy change
-- Add useCollections hook: fetches existing collection names from backend
-- Update ChunkingConfig.jsx: render controls dynamically from API field schema
-- Update IngestionPage.jsx: collection mode uses backend enum values directly"
+- FastAPI backend for ingestion, embeddings, vector DB, query, settings, and auth
+- React + Vite frontend for configuration, ingestion, collections, and chat
+- PostgreSQL-backed runtime state for settings/provider metadata/auth sessions
 
+## Repository Layout
 
-                ┌────────────────────┐
-                │   Orchestrator     │
-                └────────┬───────────┘
-                         │
-                ┌────────▼────────┐
-                │ Intent Analyzer │
-                └────────┬────────┘
-                         │
-                ┌────────▼────────┐
-                │ Context Builder │  ← (RAG + templates)
-                └────────┬────────┘
-                         │
-                ┌────────▼────────┐
-                │ Prompt Writer   │
-                └────────┬────────┘
-                         │
-        ┌────────────────▼──────────────┐
-        │ Multi-Evaluator Layer        │
-        │ ┌──────────┬──────────────┐  │
-        │ │ Critic   │ Validator    │  │
-        │ └──────────┴──────────────┘  │
-        └────────────┬─────────────────┘
-                     │
-        ┌────────────▼────────────┐
-        │ Decision Controller     │
-        │ (retry / accept / stop) │
-        └────────────┬────────────┘
-                     │
-        ┌────────────▼────────────┐
-        │ Prompt Refiner (optional)│
-        └────────────┬────────────┘
-                     │
-                ┌────▼────┐
-                │  Output │
-                └─────────┘
+- `backend/`: FastAPI app and pipeline code
+- `frontend/`: React app
+- `docker-compose.yml`: local PostgreSQL + backend services
+
+## Quick Start
+
+### 1) Run with Docker Compose (backend + postgres)
+
+From repository root:
+
+```bash
+docker compose up -d --build
+```
+
+Backend API is available at `http://localhost:8000`.
+
+### 2) Run frontend locally
+
+From `frontend/`:
+
+```bash
+npm install
+npm run dev
+```
+
+Frontend UI is available at `http://localhost:5173`.
+
+## Environment Variables
+
+### Backend
+
+Set in your backend environment (or export in shell):
+
+- `POSTGRES_USER`
+- `POSTGRES_PASSWORD`
+- `POSTGRES_DB`
+- `POSTGRES_HOST` (defaults to `localhost`, compose uses `postgres`)
+- `POSTGRES_PORT` (defaults to `5432`)
+- `GOOGLE_CLIENT_ID` (required only for Google auth)
+
+### Frontend
+
+Set in `frontend/.env`:
+
+- `VITE_WS_URL=ws://localhost:8000/ws/chat`
+- `VITE_GOOGLE_CLIENT_ID=<google-oauth-web-client-id>` (optional unless Google auth is used)
+
+## Core Features
+
+- Dynamic chunking options and ingestion forms
+- Embedding provider selection and persisted embedding state
+- Vector DB provider selection and collection operations
+- LLM/retrieval settings persisted in PostgreSQL
+- Email/password auth and Google sign-in
+- WebSocket chat streaming support
+
+## Notes
+
+- If using Docker Compose backend, keep frontend running locally unless you add a frontend service.
+- A large model artifact is currently tracked in git; consider Git LFS for files over 50MB.
+
+## Detailed Docs
+
+- Backend setup and API notes: `backend/README.md`
+- Frontend setup and configuration: `frontend/README.md`

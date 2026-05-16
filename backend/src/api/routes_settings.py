@@ -1,6 +1,4 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
-from typing import Any, Optional
 
 from src.database.option_catalog import (
     SUPPORTED_KEYS,
@@ -9,33 +7,10 @@ from src.database.option_catalog import (
     upsert_provider_option,
 )
 from src.pipeline.config.llm_settings_state import active_llm_settings
+from src.database.schema import SettingsPatch,ProviderOptionUpsert
 
 router = APIRouter()
 
-
-class SettingsPatch(BaseModel):
-    llmProvider: Optional[str] = None
-    llmModel: Optional[str] = None
-    apiKey: Optional[str] = None
-    temperature: Optional[float] = None
-    maxTokens: Optional[int] = None
-    defaultTopK: Optional[int] = None
-    simThreshold: Optional[float] = None
-    reranking: Optional[bool] = None
-    multiQuery: Optional[bool] = None
-    compression: Optional[bool] = None
-    showSources: Optional[bool] = None
-    streamResponses: Optional[bool] = None
-    systemPrompt: Optional[str] = None
-
-
-class ProviderOptionUpsert(BaseModel):
-    label: Optional[str] = None
-    models: Optional[list[str]] = None
-    requires_api_key: Optional[bool] = None
-    show_api_key: Optional[bool] = None
-    url_placeholder: Optional[str] = None
-    supports: Optional[dict[str, bool]] = None
 
 
 def _clamp_int(value: int, minimum: int, maximum: int) -> int:

@@ -8,6 +8,7 @@ _EMBED_READY = False
 def _restore_embed_model_once() -> bool:
     from src.pipeline.config.embedding_config import active_embedding
     from src.pipeline.config.embedding_factory import create_embed_model
+    from src.pipeline.config.dimension_extractor import validate_and_get_dimension
     from llama_index.core import Settings
 
     if not active_embedding.connected:
@@ -27,7 +28,15 @@ def _restore_embed_model_once() -> bool:
     )
     
     Settings.embed_model = embed_model
-    print(f"[startup] Restored embed model: {provider}/{model}")
+    
+    # Dynamically extract dimension on startup to ensure it's always current
+    dimension = validate_and_get_dimension(embed_model)
+    if dimension != active_embedding.dimension:
+        print(f"[startup] Updating dimension from {active_embedding.dimension} to {dimension}")
+        active_embedding.dimension = dimension
+        active_embedding.save()
+    
+    print(f"[startup] Restored embed model: {provider}/{model} (dimension: {dimension})")
     return True
 
 

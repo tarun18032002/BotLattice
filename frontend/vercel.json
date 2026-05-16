@@ -1,0 +1,17 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "env": {
+    "VITE_WS_URL": {
+      "description": "WebSocket URL for chat endpoint",
+      "required": true,
+      "example": "wss://your-backend-domain.com/ws/chat"
+    },
+    "VITE_GOOGLE_CLIENT_ID": {
+      "description": "Google OAuth Web Client ID (optional)",
+      "required": false
+    }
+  },
+  "regions": ["iad1"]
+}

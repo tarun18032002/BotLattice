@@ -10,7 +10,8 @@ from src.pipeline.config.settings import vectordb
 def run_ingestion_pipeline(
     file_path: str,
     chunking: ChunkingRequest,
-    collection: CollectionRequest
+    collection: CollectionRequest,
+    dim:int
 ):
     try :
         yield json.dumps({
@@ -71,7 +72,7 @@ def run_ingestion_pipeline(
             collection_name=collection.collection_name,
             mode=collection.mode,
             nodes=nodes,
-            dim=1536
+            dim=dim
         )
         try:
             while True:

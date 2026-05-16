@@ -1,4 +1,9 @@
-export async function runIngestionPipeline(chunking, collection, files, onMessage) {
+function authHeaders(token) {
+  if (!token) return {};
+  return { Authorization: `Bearer ${token}` };
+}
+
+export async function runIngestionPipeline(chunking, collection, files, onMessage, token) {
   let totalChunks = 0;
   let totalDocuments = 0;
 
@@ -10,6 +15,9 @@ export async function runIngestionPipeline(chunking, collection, files, onMessag
 
     const response = await fetch("http://127.0.0.1:8000/ingest", {
       method: "POST",
+      headers: {
+        ...authHeaders(token),
+      },
       body: formData
     });
 

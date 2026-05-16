@@ -38,13 +38,13 @@ class EmbeddingConfig:
     connected: bool = False
     dimension: int = 0  # Extracted from actual embedding model
 
-    def save(self) -> None:
+    def save(self, user_id: int = 1) -> None:
         _ensure_tables()
         db = SessionLocal()
         try:
-            row = db.query(EmbeddingStateModel).filter(EmbeddingStateModel.id == 1).first()
+            row = db.query(EmbeddingStateModel).filter(EmbeddingStateModel.id == user_id).first()
             if row is None:
-                row = EmbeddingStateModel(id=1)
+                row = EmbeddingStateModel(id=user_id)
                 db.add(row)
 
             row.provider = self.provider
@@ -61,15 +61,15 @@ class EmbeddingConfig:
             db.close()
 
     @classmethod
-    def load(cls) -> "EmbeddingConfig":
+    def load(cls, user_id: int = 1) -> "EmbeddingConfig":
         _ensure_tables()
         db = SessionLocal()
         try:
-            row = db.query(EmbeddingStateModel).filter(EmbeddingStateModel.id == 1).first()
+            row = db.query(EmbeddingStateModel).filter(EmbeddingStateModel.id == user_id).first()
             if row is None:
                 legacy_state = _load_legacy_json()
-                if legacy_state is not None:
-                    legacy_state.save()
+                if legacy_state is not None and user_id == 1:
+                    legacy_state.save(user_id=user_id)
                     return legacy_state
                 return cls()
 

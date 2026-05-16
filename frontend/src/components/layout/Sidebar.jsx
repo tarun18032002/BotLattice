@@ -37,7 +37,7 @@ export function Sidebar() {
     (async () => {
       try {
         const [currentEmbedding, currentVectordb, allCollections] = await Promise.all([
-          fetchCurrentEmbedding().catch(() => null),
+          fetchCurrentEmbedding(auth.token).catch(() => null),
           fetchCurrentVectordb().catch(() => null),
           fetchCollections().catch(() => []),
         ]);
@@ -74,7 +74,7 @@ export function Sidebar() {
     return () => {
       mounted = false;
     };
-  }, [page]);
+  }, [page, auth.token]);
 
   const summary = useMemo(() => [
     ["Collection", activeCollection],

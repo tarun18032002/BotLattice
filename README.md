@@ -64,6 +64,16 @@ Set in `frontend/.env`:
 - Email/password auth and Google sign-in
 - WebSocket chat streaming support
 
+## Deployment
+
+For production deployment (Vercel + Railway/Render/etc.):
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for:
+- Frontend deployment to Vercel
+- Backend deployment options (Railway, Render, AWS, etc.)
+- Environment configuration for production
+- Cost and monitoring guidance
+
 ## Notes
 
 - If using Docker Compose backend, keep frontend running locally unless you add a frontend service.
@@ -73,3 +83,4 @@ Set in `frontend/.env`:
 
 - Backend setup and API notes: `backend/README.md`
 - Frontend setup and configuration: `frontend/README.md`
+- Production deployment: `DEPLOYMENT.md`

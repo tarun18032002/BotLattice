@@ -1,6 +1,11 @@
 const API_BASE_URL = "http://127.0.0.1:8000";
 import { getJson, invalidateGetCache } from "./httpCache";
 
+function authHeaders(token) {
+  if (!token) return {};
+  return { Authorization: `Bearer ${token}` };
+}
+
 export async function fetchEmbeddingProviders() {
   const data = await getJson(`${API_BASE_URL}/embeddings/providers/`, {
     errorMessage: "Failed to fetch embedding providers",
@@ -23,20 +28,34 @@ export async function fetchEmbeddingProviders() {
   });
 }
 
-export async function fetchCurrentEmbedding() {
-  try {
-    return await getJson(`${API_BASE_URL}/embeddings/current/`, {
-      errorMessage: "Failed to fetch current embedding config",
-    });
-  } catch (err) {
-    if (err?.status === 404) {
-      return null;
-    }
-    throw err;
+export async function fetchCurrentEmbedding(token) {
+  const res = await fetch(`${API_BASE_URL}/embeddings/current/`, {
+    method: "GET",
+    headers: {
+      ...authHeaders(token),
+    },
+  });
+
+  if (res.status === 404) {
+    return null;
   }
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data?.detail || "Failed to fetch current embedding config";
+    const error = new Error(detail);
+    error.status = res.status;
+    throw error;
+  }
+
+  if (data?.connected === false) {
+    return null;
+  }
+
+  return data;
 }
 
-export async function connectEmbedding(payload) {
+export async function connectEmbedding(payload, token) {
   const params = new URLSearchParams();
   params.set("provider", payload.provider);
   params.set("model", payload.model);
@@ -48,6 +67,9 @@ export async function connectEmbedding(payload) {
 
   const res = await fetch(`${API_BASE_URL}/embeddings/connect/?${params.toString()}`, {
     method: "POST",
+    headers: {
+      ...authHeaders(token),
+    },
   });
 
   const data = await res.json().catch(() => ({}));

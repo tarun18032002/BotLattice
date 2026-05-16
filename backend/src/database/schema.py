@@ -1,7 +1,6 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field,EmailStr
 from typing import Optional, List
 from src.pipeline.config.enums import ChunkingType,EmbeddingProvider,VectorDBType,CollectionMode
-
 
 # -----------------------------
 # Chunking Config
@@ -74,4 +73,47 @@ class IngestRequest(BaseModel):
 
     vectordb: VectorDBRequest
 
+# -----------------------------
+# Settings Config
+# -----------------------------
 
+
+class SettingsPatch(BaseModel):
+    llmProvider: Optional[str] = None
+    llmModel: Optional[str] = None
+    apiKey: Optional[str] = None
+    temperature: Optional[float] = None
+    maxTokens: Optional[int] = None
+    defaultTopK: Optional[int] = None
+    simThreshold: Optional[float] = None
+    reranking: Optional[bool] = None
+    multiQuery: Optional[bool] = None
+    compression: Optional[bool] = None
+    showSources: Optional[bool] = None
+    streamResponses: Optional[bool] = None
+    systemPrompt: Optional[str] = None
+
+
+class ProviderOptionUpsert(BaseModel):
+    label: Optional[str] = None
+    models: Optional[list[str]] = None
+    requires_api_key: Optional[bool] = None
+    show_api_key: Optional[bool] = None
+    url_placeholder: Optional[str] = None
+    supports: Optional[dict[str, bool]] = None
+
+
+
+class RegisterRequest(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class GoogleLoginRequest(BaseModel):
+    id_token: str

@@ -3,10 +3,14 @@ import { runIngestionPipeline } from "../services/ingestionService";
 import { useChunkingOptions } from "./useChunkingOptions";
 import { connectEmbedding, fetchCurrentEmbedding } from "../api/embeddings";
 import { connectVectordb, fetchCurrentVectordb } from "../api/vectordb";
+import { useStore } from "../store/useStore";
 
 const API_KEY_REQUIRED_PROVIDERS = new Set(["openai", "google"]);
 
 export function useIngestion() {
+  const { state } = useStore();
+  const authToken = state.auth?.token || "";
+
   const [files, setFiles] = useState([]);
   const [running, setRunning] = useState(false);
   const [logs, setLogs] = useState([]);
@@ -180,7 +184,7 @@ export function useIngestion() {
         batchSize: ingestion.batchSize,
         normalize: ingestion.normalizeEmbed,
         cache: ingestion.cacheEmbed,
-      });
+      }, authToken);
 
       setIngestion((prev) => ({
         ...prev,
@@ -212,12 +216,12 @@ export function useIngestion() {
     } finally {
       setEmbeddingSaving(false);
     }
-  }, [ingestion, savedEmbedding]);
+  }, [ingestion, savedEmbedding, authToken]);
 
   useEffect(() => {
     (async () => {
       try {
-        const current = await fetchCurrentEmbedding();
+        const current = await fetchCurrentEmbedding(authToken);
         if (!current) {
           setEmbeddingConfigured(false);
           setEmbeddingEditing(true);
@@ -243,7 +247,7 @@ export function useIngestion() {
         setEmbeddingLoading(false);
       }
     })();
-  }, []);
+  }, [authToken]);
 
   useEffect(() => {
     (async () => {
@@ -351,7 +355,8 @@ export function useIngestion() {
               embeddings: hasChunks ? parsedChunks : prev.embeddings,
             }));
           }
-        }
+        },
+        authToken
       );
 
       addLog("Pipeline finished successfully", "success");
@@ -372,7 +377,7 @@ export function useIngestion() {
     } finally {
       setRunning(false);
     }
-  }, [files, ingestion, chunkingFields]);
+  }, [files, ingestion, chunkingFields, authToken]);
 
   return {
     files,

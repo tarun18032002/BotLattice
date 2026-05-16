@@ -4,7 +4,7 @@ import os
 import secrets
 
 from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel, EmailStr
+
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
 from sqlalchemy.orm import Session
@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from src.database import get_db
 from src.database.db import Base, engine
 from src.database.models import AuthSession, AuthUser
+from src.database.schema import GoogleLoginRequest,RegisterRequest,LoginRequest
 
 router = APIRouter()
 
@@ -62,19 +63,36 @@ def _get_bearer_token(authorization: str | None) -> str | None:
     return authorization[len(prefix):].strip() or None
 
 
-class RegisterRequest(BaseModel):
-    name: str
-    email: EmailStr
-    password: str
+def get_current_auth_user(
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> AuthUser:
+    token = _get_bearer_token(authorization)
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing bearer token")
+
+    session = db.query(AuthSession).filter(AuthSession.token == token).first()
+    if not session:
+        raise HTTPException(status_code=401, detail="Invalid session token")
+
+    now = datetime.now(timezone.utc)
+    expires_at = session.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if expires_at < now:
+        db.delete(session)
+        db.commit()
+        raise HTTPException(status_code=401, detail="Session expired")
+
+    user = db.query(AuthUser).filter(AuthUser.id == session.user_id).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    return user
 
 
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
 
-
-class GoogleLoginRequest(BaseModel):
-    id_token: str
 
 
 @router.post("/auth/register")

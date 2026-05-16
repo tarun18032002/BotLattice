@@ -1,12 +1,15 @@
 # connecting to local or remote embeddings models
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from typing import Optional
 
 from llama_index.core import Settings
+from src.api.routes_auth import get_current_auth_user
+from src.database.models import AuthUser
 from src.database.option_catalog import get_option
-from src.pipeline.config.embedding_config import active_embedding
+from src.pipeline.config.embedding_config import EmbeddingConfig, active_embedding
 from src.pipeline.config.embedding_factory import create_embed_model
+from src.pipeline.config.dimension_extractor import validate_and_get_dimension
 
 router = APIRouter()
 
@@ -21,17 +24,83 @@ def get_embedding_providers():
 
 
 @router.get("/embeddings/current/")
-def get_current_embedding():
+def get_current_embedding(current_user: AuthUser = Depends(get_current_auth_user)):
     """Return the active embedding config set by /embeddings/connect/."""
-    if not active_embedding.connected:
-        raise HTTPException(status_code=404, detail="No embedding model connected yet.")
+    user_embedding = EmbeddingConfig.load(user_id=current_user.id)
+
+    if not user_embedding.connected:
+        return {
+            "connected": False,
+            "provider": "",
+            "model": "",
+            "batch_size": 512,
+            "normalize": False,
+            "cache": False,
+            "dimension": 0,
+        }
+
     return {
-        "provider":   active_embedding.provider,
-        "model":      active_embedding.model,
-        "batch_size": active_embedding.batch_size,
-        "normalize":  active_embedding.normalize,
-        "cache":      active_embedding.cache,
+        "connected":  True,
+        "provider":   user_embedding.provider,
+        "model":      user_embedding.model,
+        "batch_size": user_embedding.batch_size,
+        "normalize":  user_embedding.normalize,
+        "cache":      user_embedding.cache,
+        "dimension":  user_embedding.dimension,
     }
+
+
+@router.post("/embeddings/sync-dimension/")
+def sync_embedding_dimension(current_user: AuthUser = Depends(get_current_auth_user)):
+    """
+    Sync/update the embedding dimension from the currently connected model.
+    
+    Useful if the stored dimension becomes out-of-sync with the actual model.
+    Returns the current dimension value stored in the database.
+    """
+    user_embedding = EmbeddingConfig.load(user_id=current_user.id)
+
+    if not user_embedding.connected:
+        raise HTTPException(
+            status_code=404,
+            detail="No embedding model connected yet."
+        )
+    
+    from llama_index.core import Settings
+    
+    embed_model = Settings.embed_model
+    if embed_model is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Embedding model is not loaded in memory."
+        )
+    
+    # Extract current dimension
+    current_dimension = validate_and_get_dimension(embed_model)
+    old_dimension = user_embedding.dimension
+    
+    # Update if changed
+    if current_dimension != old_dimension:
+        user_embedding.dimension = current_dimension
+        user_embedding.save(user_id=current_user.id)
+
+        # Keep runtime singleton in sync for in-process consumers.
+        active_embedding.dimension = current_dimension
+
+        return {
+            "status": "synced",
+            "old_dimension": old_dimension,
+            "new_dimension": current_dimension,
+            "provider": user_embedding.provider,
+            "model": user_embedding.model,
+        }
+    else:
+        return {
+            "status": "already_synced",
+            "dimension": current_dimension,
+            "provider": user_embedding.provider,
+            "model": user_embedding.model,
+        }
 
 
 @router.post("/embeddings/connect/")
@@ -42,6 +111,7 @@ def connect_embeddings(
     batch_size: Optional[int] = 512,
     normalize: Optional[bool] = False,
     cache: Optional[bool] = False,
+    current_user: AuthUser = Depends(get_current_auth_user),
 ):
     # ── 1. Validate provider ──────────────────────────────────────────────────
     providers = _providers()
@@ -54,16 +124,17 @@ def connect_embeddings(
 
     provider_info = providers[provider]
     effective_api_key = api_key
+    user_embedding = EmbeddingConfig.load(user_id=current_user.id)
 
     # Reuse previously saved API key for the same provider so users are not
     # forced to re-enter secrets when only changing model/options.
     if (
         not effective_api_key
-        and active_embedding.connected
-        and active_embedding.provider == provider
-        and active_embedding.api_key
+        and user_embedding.connected
+        and user_embedding.provider == provider
+        and user_embedding.api_key
     ):
-        effective_api_key = active_embedding.api_key
+        effective_api_key = user_embedding.api_key
 
     # ── 2. Validate model belongs to that provider ────────────────────────────
     if model not in provider_info["models"]:
@@ -108,7 +179,6 @@ def connect_embeddings(
                 cache=cache,
             )
             Settings.embed_model = embed_model
-
         elif provider == "google":
             import importlib
             genai = importlib.import_module("google.generativeai")
@@ -123,6 +193,7 @@ def connect_embeddings(
                 cache=cache,
             )
             Settings.embed_model = embed_model
+        
 
     except HTTPException:
         raise
@@ -132,23 +203,28 @@ def connect_embeddings(
             detail=f"Connection to '{provider}/{model}' failed: {exc}",
         )
 
-    # ── 5. Persist config so other APIs can read it (survives restarts) ────────
-    active_embedding.provider   = provider
-    active_embedding.model      = model
-    active_embedding.api_key    = effective_api_key
-    active_embedding.batch_size = batch_size
-    active_embedding.normalize  = normalize
-    active_embedding.cache      = cache
-    active_embedding.connected  = True
+    user_embedding.provider   = provider
+    user_embedding.model      = model
+    user_embedding.api_key    = effective_api_key
+    user_embedding.batch_size = batch_size
+    user_embedding.normalize  = normalize
+    user_embedding.cache      = cache
+    user_embedding.connected  = True
     
-    # Extract actual dimension from the loaded embed model
-    try:
-        active_embedding.dimension = embed_model.embed_dim
-    except Exception as exc:
-        print(f"Warning: Could not extract dimension from embed model: {exc}")
-        active_embedding.dimension = 384  # fallback
+    # Dynamically extract actual dimension from the loaded embed model
+    user_embedding.dimension = validate_and_get_dimension(embed_model)
     
-    active_embedding.save()  # write to embedding_state.json
+    user_embedding.save(user_id=current_user.id)
+
+    # Keep runtime singleton in sync for in-process consumers.
+    active_embedding.provider = user_embedding.provider
+    active_embedding.model = user_embedding.model
+    active_embedding.api_key = user_embedding.api_key
+    active_embedding.batch_size = user_embedding.batch_size
+    active_embedding.normalize = user_embedding.normalize
+    active_embedding.cache = user_embedding.cache
+    active_embedding.connected = user_embedding.connected
+    active_embedding.dimension = user_embedding.dimension
 
     return {
         "status": "connected",
@@ -157,6 +233,6 @@ def connect_embeddings(
         "batch_size": batch_size,
         "normalize": normalize,
         "cache": cache,
-        "dimension": active_embedding.dimension,
+        "dimension": user_embedding.dimension,
     }
 

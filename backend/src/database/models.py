@@ -18,7 +18,7 @@ class User(Base):
 class ChunkingRequest(Base):
     __tablename__ = "chunking_requests"
 
-    id = Column(Integer, ForeignKey("users.id"), primary_key=True, index=True)
+    id = Column(Integer, ForeignKey("auth_users.id"), primary_key=True, index=True)
     chunking_type = Column(
         Enum(ChunkingType, name="chunking_type_enum"),
         nullable=False
@@ -29,6 +29,16 @@ class ChunkingRequest(Base):
     chunk_lines = Column(Integer, default=40)
     chunk_lines_overlap = Column(Integer, default=10)
     chunk_sizes = Column(String, default="[2048, 512, 128]")
+
+
+class CollectionState(Base):
+    __tablename__ = "collection_state"
+
+    id = Column(Integer, ForeignKey("auth_users.id"), primary_key=True, index=True)
+    mode = Column(String, default="Append_to_existing")
+    collection_name = Column(String, default="documents")
+    description = Column(Text, nullable=True)
+    tags = Column(Text, nullable=True)
 
 
 class EmbeddingState(Base):

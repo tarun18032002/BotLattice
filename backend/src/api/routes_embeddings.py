@@ -7,7 +7,7 @@ from llama_index.core import Settings
 from src.api.routes_auth import get_current_auth_user
 from src.database.models import AuthUser
 from src.database.option_catalog import get_option
-from src.pipeline.config.embedding_config import EmbeddingConfig, active_embedding
+from src.pipeline.config.embedding_config import EmbeddingConfig, active_embedding, ensure_active_embedding_loaded
 from src.pipeline.config.embedding_factory import create_embed_model
 from src.pipeline.config.dimension_extractor import validate_and_get_dimension
 
@@ -59,6 +59,7 @@ def sync_embedding_dimension(current_user: AuthUser = Depends(get_current_auth_u
     Returns the current dimension value stored in the database.
     """
     user_embedding = EmbeddingConfig.load(user_id=current_user.id)
+    ensure_active_embedding_loaded(user_id=current_user.id)
 
     if not user_embedding.connected:
         raise HTTPException(
@@ -113,6 +114,7 @@ def connect_embeddings(
     cache: Optional[bool] = False,
     current_user: AuthUser = Depends(get_current_auth_user),
 ):
+    print(f"Connecting to embedding provider '{provider}' with model '{model}' for user_id={current_user.id}")
     # ── 1. Validate provider ──────────────────────────────────────────────────
     providers = _providers()
 
@@ -125,6 +127,7 @@ def connect_embeddings(
     provider_info = providers[provider]
     effective_api_key = api_key
     user_embedding = EmbeddingConfig.load(user_id=current_user.id)
+    ensure_active_embedding_loaded(user_id=current_user.id)
 
     # Reuse previously saved API key for the same provider so users are not
     # forced to re-enter secrets when only changing model/options.
@@ -159,7 +162,7 @@ def connect_embeddings(
             embed_model = create_embed_model(
                 provider=provider,
                 model=model,
-                api_key=api_key,
+                api_key=effective_api_key,
                 batch_size=batch_size,
                 normalize=normalize,
                 cache=cache,
@@ -235,4 +238,5 @@ def connect_embeddings(
         "cache": cache,
         "dimension": user_embedding.dimension,
     }
+
 

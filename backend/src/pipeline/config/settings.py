@@ -5,18 +5,18 @@ from llama_index.llms.google_genai import GoogleGenAI
 # from llama_index.embeddings.fastembed import FastEmbedEmbedding
 
 # 1. Setup API Key and Base URL
-_google_api_key = os.getenv('GOOGLE_API_KEY')
-if _google_api_key:
-    os.environ["GOOGLE_API_KEY"] = _google_api_key
+# _google_api_key = os.getenv('GOOGLE_API_KEY')
+# if _google_api_key:
+#     os.environ["GOOGLE_API_KEY"] = _google_api_key
 
 
 
 # 2. Configure Grok LLM
 # Common models: "grok-2-latest", "grok-beta", "grok-3"
-Settings.llm = GoogleGenAI(
-    model="gemini-2.5-flash",
-    # api_key="some key",  # uses GOOGLE_API_KEY env var by default
-)
+# Settings.llm = GoogleGenAI(
+#     model="gemini-2.5-flash",
+#     # api_key="some key",  # uses GOOGLE_API_KEY env var by default
+# )
 
 
 
@@ -41,5 +41,5 @@ vectordb = VectorDBRequest(
 )
 
 
-# Get embedding dimension from active_embedding config, fallback to 384 (BAAI/bge-small-en-v1.5 default)
-demension = active_embedding.dimension if active_embedding.dimension > 0 else 384
+# # Get embedding dimension from active_embedding config, fallback to 384 (BAAI/bge-small-en-v1.5 default)
+# demension = active_embedding.dimension if active_embedding.dimension > 0 else 384

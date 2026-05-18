@@ -3,7 +3,7 @@ import { useStore } from "../../store/useStore";
 import { logout } from "../../api/auth";
 import { UploadIcon, ChatIcon, DatabaseIcon, SettingsIcon } from "../ui/Icons";
 import { fetchCurrentEmbedding } from "../../api/embeddings";
-import { fetchCollections, fetchCurrentVectordb } from "../../api/vectordb";
+import { fetchCurrentVectordb } from "../../api/vectordb";
 
 const NAV_ITEMS = [
   { id: "ingest",      label: "Ingestion",   Icon: UploadIcon },
@@ -34,12 +34,20 @@ export function Sidebar() {
   useEffect(() => {
     let mounted = true;
 
+    if (!auth.token) {
+      setActiveCollection("—");
+      setActiveEmbedder("—");
+      setActiveVectorDb("—");
+      return () => {
+        mounted = false;
+      };
+    }
+
     (async () => {
       try {
-        const [currentEmbedding, currentVectordb, allCollections] = await Promise.all([
+        const [currentEmbedding, currentVectordb] = await Promise.all([
           fetchCurrentEmbedding(auth.token).catch(() => null),
           fetchCurrentVectordb().catch(() => null),
-          fetchCollections().catch(() => []),
         ]);
 
         if (!mounted) return;
@@ -56,12 +64,12 @@ export function Sidebar() {
           setActiveVectorDb("—");
         }
 
-        if (allCollections.length === 0) {
+        if (collections.length === 0) {
           setActiveCollection("—");
-        } else if (allCollections.length === 1) {
-          setActiveCollection(allCollections[0].name);
+        } else if (collections.length === 1) {
+          setActiveCollection(collections[0].name);
         } else {
-          setActiveCollection(`${allCollections.length} collections`);
+          setActiveCollection(`${collections.length} collections`);
         }
       } catch {
         if (!mounted) return;
@@ -74,7 +82,7 @@ export function Sidebar() {
     return () => {
       mounted = false;
     };
-  }, [page, auth.token]);
+  }, [auth.token, collections]);
 
   const summary = useMemo(() => [
     ["Collection", activeCollection],

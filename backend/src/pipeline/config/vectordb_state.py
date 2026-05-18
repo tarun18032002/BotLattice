@@ -8,6 +8,7 @@ from typing import Optional
 from src.database.db import Base, SessionLocal, engine
 from src.database.models import VectorDBState as VectorDBStateModel
 
+
 _LEGACY_CONFIG_FILE = Path(__file__).parent / "vectordb_state.json"
 
 
@@ -37,13 +38,16 @@ class VectorDBState:
     store_meta: bool = True
     connected: bool = False
 
-    def save(self) -> None:
+    def save(self, user_id: int = 1) -> None:
         _ensure_tables()
         db = SessionLocal()
         try:
-            row = db.query(VectorDBStateModel).filter(VectorDBStateModel.id == 1).first()
+            row = db.query(VectorDBStateModel).filter(
+                VectorDBStateModel.id == user_id
+            ).first()
+
             if row is None:
-                row = VectorDBStateModel(id=1)
+                row = VectorDBStateModel(id=user_id)
                 db.add(row)
 
             row.vectordb_type = self.vectordb_type
@@ -59,15 +63,15 @@ class VectorDBState:
             db.close()
 
     @classmethod
-    def load(cls) -> "VectorDBState":
+    def load(cls, user_id: int = 1) -> "VectorDBState":
         _ensure_tables()
         db = SessionLocal()
         try:
-            row = db.query(VectorDBStateModel).filter(VectorDBStateModel.id == 1).first()
+            row = db.query(VectorDBStateModel).filter(VectorDBStateModel.id == user_id).first()
             if row is None:
                 legacy_state = _load_legacy_json()
                 if legacy_state is not None:
-                    legacy_state.save()
+                    legacy_state.save(user_id=user_id)
                     return legacy_state
                 return cls()
 
@@ -86,4 +90,25 @@ class VectorDBState:
             db.close()
 
 
-active_vectordb = VectorDBState.load()
+_active_vectordb_loaded = False
+active_vectordb = VectorDBState()
+
+
+def ensure_active_vectordb_loaded(user_id: int = 1) -> VectorDBState:
+    """Lazily load active vector DB state from DB on first use."""
+    global _active_vectordb_loaded
+
+    if _active_vectordb_loaded:
+        return active_vectordb
+
+    loaded = VectorDBState.load(user_id=user_id)
+    active_vectordb.vectordb_type = loaded.vectordb_type
+    active_vectordb.url = loaded.url
+    active_vectordb.api_key = loaded.api_key
+    active_vectordb.distance_metric = loaded.distance_metric
+    active_vectordb.hybrid_search = loaded.hybrid_search
+    active_vectordb.store_meta = loaded.store_meta
+    active_vectordb.connected = loaded.connected
+    _active_vectordb_loaded = True
+
+    return active_vectordb

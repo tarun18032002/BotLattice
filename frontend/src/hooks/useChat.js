@@ -44,9 +44,17 @@ export function useChat() {
 
   // ── WebSocket lifecycle ──────────────────────────────────────────────────────
   useEffect(() => {
-    wsManager.connect(
-      // onMessage — handles both RAG { question, answer } and agent stream types
-      (data) => {
+    const authToken = state.auth.token;
+    if (!authToken) {
+      console.warn("[CHAT] No authentication token available, skipping WebSocket connection");
+      return;
+    }
+
+    try {
+      wsManager.connect(
+        authToken,
+        // onMessage — handles both RAG { question, answer } and agent stream types
+        (data) => {
         const msgType = data.type;
         console.log("[CHAT] Received message type:", msgType, "data:", data);
 
@@ -154,12 +162,30 @@ export function useChat() {
           ]);
           pendingQuestion.current = null;
         }
+
+        if (newState === WS_STATE.ERROR) {
+          setThinking(false);
+          console.log("[CHAT] WebSocket error state");
+        }
       },
     );
+    } catch (err) {
+      console.error("[CHAT] Failed to connect to WebSocket:", err);
+      setWsState(WS_STATE.ERROR);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role:    "assistant",
+          content: `⚠ Failed to connect to chat service: ${err.message}. Please refresh the page or try logging in again.`,
+          sources: [],
+          ts: new Date().toLocaleTimeString(),
+        },
+      ]);
+    }
 
     return () => wsManager.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // mount only
+  }, [state.auth.token]); // reconnect when token changes
 
   // ── Send ─────────────────────────────────────────────────────────────────────
   const send = useCallback(() => {

@@ -8,6 +8,7 @@ from src.pipeline.config.embedding_config import EmbeddingConfig
 from src.pipeline.config.embedding_factory import create_embed_model
 from src.pipeline.query.query_pipeline import run_query
 from src.pipeline.config.enums import VectorDBType
+from src.pipeline.config.vectordb_state import ensure_active_vectordb_loaded
 
 router = APIRouter()
 
@@ -33,13 +34,19 @@ def query_rag(req: QueryRequest, current_user: AuthUser = Depends(get_current_au
             cache=user_embedding.cache,
         )
 
+        
+        # Always fetch db_type from user's vector DB state (never from embedding config)
+        vectordb_state = ensure_active_vectordb_loaded(user_id=current_user.id)
+        db_type = vectordb_state.vectordb_type or "qdrant"
+
+        # Only allow explicit top_k override from client, all other settings from DB
         response = run_query(
             req.question,
             collection_name=req.collection_name,
-            db_type=VectorDBType.QDRANT,
-            top_k=req.top_k,
-            retrieval_settings=req.retrieval_settings,
-
+            db_type=db_type,
+            top_k=req.top_k,  # Only top_k is allowed as override
+            engine_settings_overrides=None,  # No client overrides for settings
+            user_id=current_user.id,
         )
 
         return {

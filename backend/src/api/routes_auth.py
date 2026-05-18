@@ -4,15 +4,18 @@ import os
 import secrets
 
 from fastapi import APIRouter, Depends, Header, HTTPException
-
-from google.auth.transport import requests as google_requests
-from google.oauth2 import id_token as google_id_token
 from sqlalchemy.orm import Session
-
+from src.database.models import AuthSession, AuthUser
 from src.database import get_db
 from src.database.db import Base, engine
-from src.database.models import AuthSession, AuthUser
-from src.database.schema import GoogleLoginRequest,RegisterRequest,LoginRequest
+from src.database.schema import RegisterRequest, LoginRequest, GoogleLoginRequest
+from google.oauth2 import id_token as google_id_token
+from google.auth.transport import requests as google_requests
+
+from cachetools import TTLCache
+
+# In-memory cache for sessions
+session_cache = TTLCache(maxsize=1000, ttl=3600)  # Cache up to 1000 sessions for 1 hour
 
 router = APIRouter()
 
@@ -63,18 +66,30 @@ def _get_bearer_token(authorization: str | None) -> str | None:
     return authorization[len(prefix):].strip() or None
 
 
-def get_current_auth_user(
+def validate_session(
     authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
-) -> AuthUser:
+):
     token = _get_bearer_token(authorization)
     if not token:
         raise HTTPException(status_code=401, detail="Missing bearer token")
 
-    session = db.query(AuthSession).filter(AuthSession.token == token).first()
-    if not session:
+    # Check cache first
+    if token in session_cache:
+        return session_cache[token]
+
+    # Fetch session and user in a single query
+    result = (
+        db.query(AuthSession, AuthUser)
+        .join(AuthUser, AuthSession.user_id == AuthUser.id)
+        .filter(AuthSession.token == token)
+        .first()
+    )
+
+    if not result:
         raise HTTPException(status_code=401, detail="Invalid session token")
 
+    session, user = result
     now = datetime.now(timezone.utc)
     expires_at = session.expires_at
     if expires_at.tzinfo is None:
@@ -85,15 +100,16 @@ def get_current_auth_user(
         db.commit()
         raise HTTPException(status_code=401, detail="Session expired")
 
-    user = db.query(AuthUser).filter(AuthUser.id == session.user_id).first()
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
 
+    # Cache the session
+    session_cache[token] = user
+
     return user
 
-
-
-
+def get_current_auth_user(current_user: AuthUser = Depends(validate_session)) -> AuthUser:
+    return current_user
 
 @router.post("/auth/register")
 def register(req: RegisterRequest, db: Session = Depends(get_db)):
@@ -237,7 +253,9 @@ def google_login(req: GoogleLoginRequest, db: Session = Depends(get_db)):
 def me(authorization: str | None = Header(default=None), db: Session = Depends(get_db)):
     _ensure_tables()
 
+    print(f"Authorization header received in /auth/me: {authorization}")
     token = _get_bearer_token(authorization)
+    print(f"Token received in /auth/me: {token}")
     if not token:
         raise HTTPException(status_code=401, detail="Missing bearer token")
 

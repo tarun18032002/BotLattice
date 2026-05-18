@@ -9,7 +9,7 @@ import { fetchCurrentSettings, fetchSettingsOptions, saveSettings } from "../../
 
 export function SettingsPage() {
   const { state, dispatch } = useStore();
-  const { settings } = state;
+  const { settings, auth } = state;
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(true);
@@ -22,7 +22,7 @@ export function SettingsPage() {
     (async () => {
       try {
         const [serverSettings, serverOptions] = await Promise.all([
-          fetchCurrentSettings(),
+          fetchCurrentSettings(auth.token),
           fetchSettingsOptions(),
         ]);
 
@@ -37,13 +37,13 @@ export function SettingsPage() {
         setLoading(false);
       }
     })();
-  }, [dispatch]);
+  }, [dispatch, auth.token]);
 
   const onSave = useCallback(async () => {
     setSaving(true);
     setStatus("");
     try {
-      const data = await saveSettings(settings);
+      const data = await saveSettings(settings, auth.token);
       dispatch({ type: "UPDATE_SETTINGS", payload: data.settings ?? {} });
       setStatus("Saved");
     } catch (err) {
@@ -51,7 +51,7 @@ export function SettingsPage() {
     } finally {
       setSaving(false);
     }
-  }, [settings, dispatch]);
+  }, [settings, dispatch, auth.token]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">

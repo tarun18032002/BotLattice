@@ -3,14 +3,33 @@ from src.pipeline.config.enums import VectorDBType, CollectionMode
 from src.pipeline.query.retriever import get_retriever
 from src.pipeline.query.query_engine import build_query_engine
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from src.pipeline.config.llm_settings_state import active_llm_settings
+from src.pipeline.config.llm_settings_state import ensure_active_llm_settings_loaded
 from src.pipeline.config.embedding_runtime import ensure_embed_model_ready
+from src.pipeline.config.vectordb_state import ensure_active_vectordb_loaded
 from llama_index.core import Settings
 
 
-def _resolve_top_k(top_k, retrieval_settings):
-    saved_settings = active_llm_settings.to_dict()
-    runtime_settings = retrieval_settings if isinstance(retrieval_settings, dict) else {}
+def _resolve_top_k(top_k, engine_settings_overrides, user_id: int = 1):
+    """Resolve effective top_k by merging database settings with runtime overrides.
+    
+    Settings hierarchy:
+    1. Explicit top_k parameter (highest priority)
+    2. Database LLM settings (defaultTopK from user's saved config)
+    3. Hardcoded default: 5
+    
+    Args:
+        top_k: Client-provided top_k override
+        engine_settings_overrides: Optional dict with query engine setting overrides
+        user_id: User ID to fetch saved settings from database
+    
+    Note: All retrieval settings (reranking, multiQuery, compression, etc.) come from
+    the user's LLMSettingsState in the database via ensure_active_llm_settings_loaded()
+    """
+    # Fetch user's saved settings from database
+    saved_settings = ensure_active_llm_settings_loaded(user_id=user_id).to_dict()
+    # Optional runtime overrides from client
+    runtime_settings = engine_settings_overrides if isinstance(engine_settings_overrides, dict) else {}
+    # Merge: database defaults + client overrides (client takes priority)
     merged_settings = {**saved_settings, **runtime_settings}
 
     value = top_k if top_k is not None else merged_settings.get("defaultTopK", 5)
@@ -19,11 +38,27 @@ def _resolve_top_k(top_k, retrieval_settings):
     except Exception:
         return 5
 
-def run_query(query:str,collection_name:str,db_type:VectorDBType, top_k=None, retrieval_settings=None):
+def run_query(
+    query: str,
+    collection_name: str,
+    top_k=None,
+    engine_settings_overrides=None,
+    db_type=None,
+    user_id: int = 1
+):
+    """Main RAG Query pipeline.
+    
+    Settings hierarchy (highest to lowest priority):
+    1. Client-provided overrides (top_k, engine_settings_overrides)
+    2. Database settings per user (embedding config, LLM settings + retrieval settings)
+    3. Hardcoded defaults
+    
+    All retrieval settings come from user's LLMSettingsState in database:
+    - defaultTopK, reranking, multiQuery, compression, simThreshold, etc.
+    - These are fetched via ensure_active_llm_settings_loaded(user_id)
+    - Client can optionally override them via engine_settings_overrides parameter
     """
-    Main RAG Query pipeline 
-    """
-    try : 
+    try:
         if not isinstance(query, str) or not query.strip():
             raise ValueError("query must be a non-empty string")
 
@@ -36,6 +71,14 @@ def run_query(query:str,collection_name:str,db_type:VectorDBType, top_k=None, re
         # Ensure embed model is available even if startup warm-up is still running.
         ensure_embed_model_ready()
 
+        # user_embedding = EmbeddingConfig.load(user_id=user_id)
+        vectortState =ensure_active_vectordb_loaded(user_id=user_id)  # Ensure vector DB state is loaded for this user
+        # print(f"User {user_id} embedding config: connected={user_embedding.connected}, provider='{user_embedding.provider}', model='{user_embedding.model}', dimension={user_embedding.dimension}")
+        
+        # Use provided db_type or determine from embedding config
+        if db_type is None:
+            db_type = vectortState.vectordb_type.lower() if vectortState.connected else "qdrant"
+        
         print(f"Running RAG query: '{query}' against collection '{collection_name}' using DB '{db_type}'")
         
         # Get embedding dimension from collection metadata (stored when collection was created)
@@ -43,22 +86,24 @@ def run_query(query:str,collection_name:str,db_type:VectorDBType, top_k=None, re
         
         # Connect to existing vector store
         index = VectorDBFactory.create_index(
-            db_type= db_type,
+            db_type=db_type,
             mode=None,
             collection_name=collection_name,
             dim=embed_dim 
         )
 
         print(f"index of type {type(index)} created successfully for collection '{collection_name}'")
-        effective_top_k = _resolve_top_k(top_k, retrieval_settings)
+        effective_top_k = _resolve_top_k(top_k, engine_settings_overrides, user_id=user_id)
         # Create retriever
         retriever = get_retriever(index, similarity_top_k=effective_top_k)
 
         # Create query engine
+        # Note: All retrieval settings (reranking, multiQuery, etc.) come from database per user
         query_engine = build_query_engine(
             retriever,
-            retrieval_settings=retrieval_settings,
+            engine_settings_overrides=engine_settings_overrides,
             top_k=effective_top_k,
+            user_id=user_id,
         )
 
         # Run query
@@ -66,16 +111,19 @@ def run_query(query:str,collection_name:str,db_type:VectorDBType, top_k=None, re
 
         return response
     except Exception as e:
+        import traceback
+        traceback_str = traceback.format_exc()
+        print(f"Error during query execution: {str(e)}\n{traceback_str}")
         raise RuntimeError(f"Error during query execution: {str(e)}")
 
 
-def run_direct_query(query: str, system_prompt: str | None = None):
+def run_direct_query(query: str, system_prompt: str | None = None, user_id: int = 1):
     """Run a direct (non-RAG) LLM completion."""
     try:
         if not isinstance(query, str) or not query.strip():
             raise ValueError("query must be a non-empty string")
 
-        saved = active_llm_settings.to_dict()
+        saved = ensure_active_llm_settings_loaded(user_id=user_id).to_dict()
         provider = str(saved.get("llmProvider", "")).strip().lower()
         model = saved.get("llmModel") or "gpt-4o-mini"
         api_key = saved.get("apiKey")

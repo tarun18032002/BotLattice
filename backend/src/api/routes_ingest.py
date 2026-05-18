@@ -7,8 +7,9 @@ import os
 import tempfile
 from fastapi import Depends
 
-from src.pipeline.config  import settings
 from src.pipeline.config.embedding_config import EmbeddingConfig
+from src.pipeline.config.chunking_state import ChunkingConfig
+from src.pipeline.config.collection_state import CollectionConfig
 from src.pipeline.ingestion.pipeline import run_ingestion_pipeline
 from src.logger.logging import StreamLogHandler
 from src.pipeline.config.schemas import ChunkingRequest,CollectionRequest
@@ -24,17 +25,43 @@ router = APIRouter()
 async def ingest_file(
     file: UploadFile = File(...),
     chunking: str = Form(...),
-    collection:str = Form(...),
+    collection: str = Form(...),
     current_user: AuthUser = Depends(get_current_auth_user)
 
 ):
-    # Validate chunking and collection JSON before starting the streaming response
+    incoming_chunking = None
+    incoming_collection = None
+
     try:
-        chunking_obj = ChunkingRequest.model_validate_json(chunking)
-        collection_obj = CollectionRequest.model_validate_json(collection)
+        incoming_chunking = ChunkingRequest.model_validate_json(chunking)
     except Exception as e:
-        # It's better to catch this early before entering the StreamingResponse
-        raise HTTPException(status_code=400, detail=f"Invalid JSON data: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid chunking JSON data: {str(e)}")
+
+    try:
+        incoming_collection = CollectionRequest.model_validate_json(collection)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid collection JSON data: {str(e)}")
+
+    # Source of truth is DB. If config rows are missing, allow one-time bootstrap
+    # from incoming payload and persist those values.
+    if not ChunkingConfig.exists(user_id=current_user.id):
+        if incoming_chunking is None:
+            raise HTTPException(
+                status_code=400,
+                detail="No chunking config found in DB. Save chunking config first.",
+            )
+        ChunkingConfig.from_request(incoming_chunking).save(user_id=current_user.id)
+
+    if not CollectionConfig.exists(user_id=current_user.id):
+        if incoming_collection is None:
+            raise HTTPException(
+                status_code=400,
+                detail="No collection config found in DB. Save collection config first.",
+            )
+        CollectionConfig.from_request(incoming_collection).save(user_id=current_user.id)
+
+    chunking_obj = ChunkingConfig.load(user_id=current_user.id).to_request()
+    collection_obj = CollectionConfig.load(user_id=current_user.id).to_request()
 
 
     async def log_stream():

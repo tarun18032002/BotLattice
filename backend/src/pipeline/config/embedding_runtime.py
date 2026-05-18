@@ -6,10 +6,12 @@ _EMBED_READY = False
 
 
 def _restore_embed_model_once() -> bool:
-    from src.pipeline.config.embedding_config import active_embedding
+    from src.pipeline.config.embedding_config import ensure_active_embedding_loaded
     from src.pipeline.config.embedding_factory import create_embed_model
     from src.pipeline.config.dimension_extractor import validate_and_get_dimension
     from llama_index.core import Settings
+
+    active_embedding = ensure_active_embedding_loaded()
 
     if not active_embedding.connected:
         return False

@@ -16,7 +16,7 @@ import qdrant_client
 # import faiss
 
 from src.pipeline.config.enums import VectorDBType,CollectionMode
-from src.pipeline.config.vectordb_state import active_vectordb
+from src.pipeline.config.vectordb_state import ensure_active_vectordb_loaded
 
 
 class VectorDBFactory:
@@ -36,10 +36,11 @@ class VectorDBFactory:
         **kwargs
     ) -> BasePydanticVectorStore:
         db_type = VectorDBFactory._normalize_db_type(db_type)
+        state = ensure_active_vectordb_loaded()
         
         if db_type == VectorDBType.QDRANT:
-            url = active_vectordb.url or "http://localhost:6333"
-            api_key = active_vectordb.api_key
+            url = state.url or "http://localhost:6333"
+            api_key = state.api_key
             print(f"The QDrant Url : {url}")
             client = qdrant_client.QdrantClient(
                 url=url,
@@ -68,12 +69,13 @@ class VectorDBFactory:
         Fetch all collection names from the configured vector DB
         """
         db_type = VectorDBFactory._normalize_db_type(db_type)
+        state = ensure_active_vectordb_loaded()
 
         if db_type == VectorDBType.QDRANT:
             import qdrant_client
 
-            url = active_vectordb.url or "http://localhost:6333"
-            api_key = active_vectordb.api_key
+            url = state.url or "http://localhost:6333"
+            api_key = state.api_key
             client = qdrant_client.QdrantClient(
                 url=url,
                 api_key=api_key,
@@ -99,9 +101,10 @@ class VectorDBFactory:
     def _delete_collection(cls, db_type: VectorDBType, collection_name: str):
         """Delete a collection from the vector DB."""
         db_type = cls._normalize_db_type(db_type)
+        state = ensure_active_vectordb_loaded()
         if db_type == VectorDBType.QDRANT:
-            url = active_vectordb.url or "http://localhost:6333"
-            api_key = active_vectordb.api_key
+            url = state.url or "http://localhost:6333"
+            api_key = state.api_key
             client = qdrant_client.QdrantClient(
                 url=url,
                 api_key=api_key,
@@ -114,9 +117,10 @@ class VectorDBFactory:
     def get_collection_dimension(cls, db_type: VectorDBType, collection_name: str) -> int:
         """Get vector dimension from a collection in the vector DB."""
         db_type = cls._normalize_db_type(db_type)
+        state = ensure_active_vectordb_loaded()
         if db_type == VectorDBType.QDRANT:
-            url = active_vectordb.url or "http://localhost:6333"
-            api_key = active_vectordb.api_key
+            url = state.url or "http://localhost:6333"
+            api_key = state.api_key
             client = qdrant_client.QdrantClient(
                 url=url,
                 api_key=api_key,

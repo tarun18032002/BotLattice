@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException
+from fastapi import Depends
 
 from src.database.option_catalog import (
     SUPPORTED_KEYS,
@@ -6,8 +7,10 @@ from src.database.option_catalog import (
     get_option,
     upsert_provider_option,
 )
-from src.pipeline.config.llm_settings_state import active_llm_settings
+from src.pipeline.config.llm_settings_state import ensure_active_llm_settings_loaded
 from src.database.schema import SettingsPatch,ProviderOptionUpsert
+from src.database.models import AuthUser
+from src.api.routes_auth import get_current_auth_user
 
 router = APIRouter()
 
@@ -22,8 +25,9 @@ def _clamp_float(value: float, minimum: float, maximum: float) -> float:
 
 
 @router.get("/settings/current/")
-def get_current_settings():
-    return active_llm_settings.to_dict()
+def get_current_settings(current_user: AuthUser = Depends(get_current_auth_user)):
+    settings_state = ensure_active_llm_settings_loaded(user_id=current_user.id)
+    return settings_state.to_dict()
 
 
 @router.get("/settings/options/")
@@ -80,8 +84,9 @@ def delete_any_option(key: str, provider: str):
 
 
 @router.post("/settings/save/")
-def save_settings(req: SettingsPatch):
+def save_settings(req: SettingsPatch, current_user: AuthUser = Depends(get_current_auth_user)):
     patch = req.model_dump(exclude_none=True)
+    settings_state = ensure_active_llm_settings_loaded(user_id=current_user.id)
 
     if "temperature" in patch:
         patch["temperature"] = _clamp_float(patch["temperature"], 0.0, 1.0)
@@ -95,10 +100,10 @@ def save_settings(req: SettingsPatch):
     if "simThreshold" in patch:
         patch["simThreshold"] = _clamp_float(patch["simThreshold"], 0.0, 1.0)
 
-    active_llm_settings.update_from_dict(patch)
-    active_llm_settings.save()
+    settings_state.update_from_dict(patch)
+    settings_state.save(user_id=current_user.id)
 
     return {
         "status": "saved",
-        "settings": active_llm_settings.to_dict(),
+        "settings": settings_state.to_dict(),
     }

@@ -89,5 +89,26 @@ class EmbeddingConfig:
             db.close()
 
 
-# Module-level singleton — loaded from PostgreSQL on first import
-active_embedding = EmbeddingConfig.load()
+_active_embedding_loaded = False
+active_embedding = EmbeddingConfig()
+
+
+def ensure_active_embedding_loaded(user_id: int = 1) -> EmbeddingConfig:
+    """Lazily load active embedding state from DB on first use."""
+    global _active_embedding_loaded
+
+    if _active_embedding_loaded:
+        return active_embedding
+
+    loaded = EmbeddingConfig.load(user_id=user_id)
+    active_embedding.provider = loaded.provider
+    active_embedding.model = loaded.model
+    active_embedding.api_key = loaded.api_key
+    active_embedding.batch_size = loaded.batch_size
+    active_embedding.normalize = loaded.normalize
+    active_embedding.cache = loaded.cache
+    active_embedding.connected = loaded.connected
+    active_embedding.dimension = loaded.dimension
+    _active_embedding_loaded = True
+
+    return active_embedding

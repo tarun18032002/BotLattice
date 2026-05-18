@@ -20,7 +20,7 @@ try:
 except ImportError:
     LONG_LINGUA_AVAILABLE = False
 
-from src.pipeline.config.llm_settings_state import active_llm_settings
+from src.pipeline.config.llm_settings_state import ensure_active_llm_settings_loaded
 from .prompt import qa_prompt
 
 
@@ -35,20 +35,26 @@ def _safe_default_target_tokens(max_tokens: int) -> int:
     return max(128, min(2048, max_tokens // 2))
 
 
-def build_query_engine(retriever, retrieval_settings=None, top_k=None):
+def build_query_engine(retriever, engine_settings_overrides=None, top_k=None, user_id: int = 1):
     """
     Build a robust query engine with:
     - Multi-query fusion
     - Reranking
     - Context compression
     - Optional streaming + citations
+    
+    Settings are fetched from user's LLMSettingsState in database (includes all retrieval config)
+    and merged with optional runtime overrides from client.
     """
 
     # -------------------------------
-    # 1. Merge settings
+    # 1. Merge settings (database + client overrides)
     # -------------------------------
-    saved_settings = active_llm_settings.to_dict()
-    runtime_settings = retrieval_settings if isinstance(retrieval_settings, dict) else {}
+    # Fetch user's saved settings from database (includes LLM + retrieval config)
+    saved_settings = ensure_active_llm_settings_loaded(user_id=user_id).to_dict()
+    # Optional runtime overrides from client
+    runtime_settings = engine_settings_overrides if isinstance(engine_settings_overrides, dict) else {}
+    # Merge: database defaults + client overrides (client takes priority)
     merged_settings = {**saved_settings, **runtime_settings}
 
     final_top_k = _to_int(

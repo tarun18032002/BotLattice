@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { runIngestionPipeline } from "../services/ingestionService";
+import { saveChunking, saveCollection } from "../api/chunking";
 import { useChunkingOptions } from "./useChunkingOptions";
 import { connectEmbedding, fetchCurrentEmbedding } from "../api/embeddings";
 import { connectVectordb, fetchCurrentVectordb } from "../api/vectordb";
@@ -73,6 +74,11 @@ export function useIngestion() {
   const addLog = (msg, level = "info") => {
     setLogs((prev) => [...prev, { msg, level, ts: new Date().toLocaleTimeString() }]);
   };
+
+  useEffect(() => {
+    if (!logRef.current) return;
+    logRef.current.scrollTop = logRef.current.scrollHeight;
+  }, [logs]);
 
   const addFiles = (newFiles) => {
     setFiles((prev) => [...prev, ...newFiles]);
@@ -331,9 +337,10 @@ export function useIngestion() {
         tags: ingestion.Tags || ""
       };
 
+      await saveChunking(chunking, authToken);
+      await saveCollection(collection, authToken);
+
       const { chunks, documents } = await runIngestionPipeline(
-        chunking,
-        collection,
         files,
         (msg, level = "info", parsed = null) => {
           addLog(msg, level);
@@ -356,7 +363,9 @@ export function useIngestion() {
             }));
           }
         },
-        authToken
+        authToken,
+        chunking,
+        collection
       );
 
       addLog("Pipeline finished successfully", "success");

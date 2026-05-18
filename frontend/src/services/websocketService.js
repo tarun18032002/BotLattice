@@ -9,7 +9,7 @@
  *   RECEIVE: { question: string, answer: string }
  */
 
-const WS_URL = import.meta.env.VITE_WS_URL ?? "ws://127.0.0.1:8000/ws/chat";
+const WS_BASE_URL = import.meta.env.VITE_WS_URL ?? "ws://127.0.0.1:8000/ws/chat";
 
 // ── Connection states ─────────────────────────────────────────────────────────
 export const WS_STATE = {
@@ -27,6 +27,7 @@ class WebSocketManager {
     this._onStateChange = null;   // (state: WS_STATE) => void
     this._reconnectTimer = null;
     this._shouldReconnect = false;
+    this._token         = null;   // Store token for reconnections
   }
 
   /** Current raw WebSocket readyState mapped to WS_STATE */
@@ -40,11 +41,18 @@ class WebSocketManager {
   }
 
   /**
-   * Open the WebSocket connection.
+   * Open the WebSocket connection with authentication token.
+   * @param {string} token           - Authentication token from localStorage
    * @param {Function} onMessage     - called with each parsed response
    * @param {Function} onStateChange - called when connection state changes
    */
-  connect(onMessage, onStateChange) {
+  connect(token, onMessage, onStateChange) {
+    if (!token) {
+      console.error("[WS] Authentication token is required");
+      throw new Error("Authentication token is required for WebSocket connection");
+    }
+    
+    this._token = token;
     this._onMessage     = onMessage;
     this._onStateChange = onStateChange;
     this._shouldReconnect = true;
@@ -90,10 +98,14 @@ class WebSocketManager {
     this._emit(WS_STATE.CONNECTING);
 
     try {
-      this._socket = new WebSocket(WS_URL);
-      console.log("[WS] Attempting to connect to:", WS_URL, {
+      // Append token to WebSocket URL as query parameter
+      const wsUrl = `${WS_BASE_URL}?token=${encodeURIComponent(this._token)}`;
+      this._socket = new WebSocket(wsUrl);
+      console.log("[WS] Attempting to connect to:", wsUrl.replace(/token=[^&]*/g, 'token=***'), {
         timestamp: new Date().toISOString(),
         readyState: this._socket?.readyState,
+        hasToken: !!this._token,
+        fullUrl: wsUrl.substring(0, 50) + "...",
       });
     } catch (err) {
       console.error("[WS] Failed to construct WebSocket:", err);
@@ -103,7 +115,7 @@ class WebSocketManager {
     }
 
     this._socket.onopen = () => {
-      console.log("[WS] Connected ✓", WS_URL, {
+      console.log("[WS] Connected ✓", WS_BASE_URL, {
         timestamp: new Date().toISOString(),
         readyState: this._socket?.readyState,
       });
@@ -133,9 +145,16 @@ class WebSocketManager {
     };
 
     this._socket.onclose = (event) => {
+      const closeReason = (() => {
+        if (event.code === 4001) return "Authentication failed or expired";
+        if (!event.wasClean) return `Unexpected close (code: ${event.code})`;
+        return event.reason || "(no reason)";
+      })();
+      
       console.log(`[WS] Closed — code: ${event.code}, wasClean: ${event.wasClean}`, {
-        reason: event.reason,
+        reason: closeReason,
         timestamp: new Date().toISOString(),
+        url: this._socket?.url,
       });
       this._emit(WS_STATE.CLOSED);
       if (this._shouldReconnect) this._scheduleReconnect();

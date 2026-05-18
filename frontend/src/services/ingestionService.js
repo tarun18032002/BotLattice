@@ -3,27 +3,47 @@ function authHeaders(token) {
   return { Authorization: `Bearer ${token}` };
 }
 
-export async function runIngestionPipeline(chunking, collection, files, onMessage, token) {
+const INGEST_TIMEOUT_MS = 10 * 60 * 1000;
+
+export async function runIngestionPipeline(files, onMessage, token, chunking, collection) {
   let totalChunks = 0;
   let totalDocuments = 0;
 
   for (const file of files) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), INGEST_TIMEOUT_MS);
+
     const formData = new FormData();
     formData.append("file", file);
     formData.append("chunking", JSON.stringify(chunking));
     formData.append("collection", JSON.stringify(collection));
 
-    const response = await fetch("http://127.0.0.1:8000/ingest", {
-      method: "POST",
-      headers: {
-        ...authHeaders(token),
-      },
-      body: formData
-    });
+    let response;
+    try {
+      response = await fetch("http://127.0.0.1:8000/ingest", {
+        method: "POST",
+        headers: {
+          ...authHeaders(token),
+        },
+        body: formData,
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (err?.name === "AbortError") {
+        throw new Error(`Ingest timed out after ${Math.floor(INGEST_TIMEOUT_MS / 60000)} minutes for file: ${file.name}`);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       const err = await response.text();
       throw new Error(`Ingest failed (${response.status}): ${err}`);
+    }
+
+    if (!response.body) {
+      throw new Error("Ingest failed: no response stream received from server.");
     }
 
     const reader = response.body.getReader();
@@ -53,7 +73,8 @@ export async function runIngestionPipeline(chunking, collection, files, onMessag
           if (Number.isFinite(Number(parsed.documents))) fileDocuments = Number(parsed.documents);
         }
       } catch (err) {
-        console.warn("Stream parse error", err);
+        // Keep the UI log console useful even when backend emits plain-text lines.
+        onMessage(line, "info", null);
       }
     };
 

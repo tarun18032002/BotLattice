@@ -15,9 +15,9 @@ class ChunkingRequest(BaseModel):
     chunk_overlap: Optional[int] = 50
 
     # Code splitter params
-    language: Optional[str] = "python"
-    chunk_lines: Optional[int] = 40
-    chunk_lines_overlap: Optional[int] = 10
+    language: Optional[str] = ""
+    chunk_lines: Optional[int] = 0
+    chunk_lines_overlap: Optional[int] = 0
 
     # Hierarchical params
     chunk_sizes: Optional[List[int]] = Field(
@@ -56,7 +56,7 @@ class VectorDBRequest(BaseModel):
 # -----------------------------
 
 class CollectionRequest(BaseModel):
-    mode: CollectionMode = CollectionMode.APPEND_TO_EXISTING
+    mode: CollectionMode = CollectionMode.CREATE_NEW
     collection_name: str = "documents"
     description: Optional[str] = None
     tags: Optional[str] = None # Or List[str] if you split the string later

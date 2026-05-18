@@ -15,7 +15,6 @@ from src.api.routes_settings import router as settings_router
 from src.api.routes_auth import router as auth_router
 
 from fastapi.middleware.cors import CORSMiddleware
-import src.pipeline.config.settings
 from src.pipeline.config.embedding_runtime import warm_embed_model_in_background
 
 
@@ -41,11 +40,11 @@ app.add_middleware(
     max_age=3600,
 )
 
+app.include_router(auth_router)
 app.include_router(ingest_router)
 app.include_router(settings_router)
 app.include_router(chunking_router)
 app.include_router(vectordb_router)
 app.include_router(embeddings_router)
-app.include_router(auth_router)
 app.include_router(query_router)
 app.include_router(ws_router)

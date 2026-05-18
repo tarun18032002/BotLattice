@@ -3,8 +3,9 @@ import json
 from src.pipeline.ingestion.reader import Reader
 from src.pipeline.ingestion.chunking import Chunking
 from src.pipeline.config.vector_store import VectorDBFactory
+from src.pipeline.config.vectordb_state import active_vectordb
 from src.pipeline.config.schemas import ChunkingRequest,CollectionRequest
-from src.pipeline.config.settings import vectordb
+from src.pipeline.config.enums import VectorDBType
 
 
 def run_ingestion_pipeline(
@@ -59,7 +60,7 @@ def run_ingestion_pipeline(
         print(f"Split documents into {chunk_count} nodes.")
 
         # 3️⃣ Vector DB ingestion
-        db_type = vectordb.vectordb_type
+        db_type = active_vectordb.vectordb_type or VectorDBType.QDRANT.value
 
         yield json.dumps({
             "msg": f"Connecting to Vector DB: {db_type}",

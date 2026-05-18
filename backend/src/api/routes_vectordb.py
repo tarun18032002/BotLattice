@@ -6,8 +6,7 @@ from src.database.option_catalog import get_option
 from src.pipeline.config.vectordb_config import VECTORDB_OPTIONS
 from src.pipeline.config.schemas import VectorDBType
 from src.pipeline.config.vector_store import VectorDBFactory
-from src.pipeline.config.settings import vectordb
-from src.pipeline.config.vectordb_state import active_vectordb
+from src.pipeline.config.vectordb_state import active_vectordb, ensure_active_vectordb_loaded
 
 router = APIRouter()
 
@@ -31,8 +30,9 @@ def get_vectordb_options(vectordb_type:VectorDBType):
 
 def _qdrant_client():
     """Return a Qdrant client using the active connection config."""
-    url = active_vectordb.url or "http://localhost:6333"
-    api_key = active_vectordb.api_key or None
+    state = ensure_active_vectordb_loaded()
+    url = state.url or "http://localhost:6333"
+    api_key = state.api_key or None
     return qdrant_client.QdrantClient(url=url, api_key=api_key)
 
 
@@ -68,7 +68,8 @@ def _collection_detail(client, name: str) -> dict:
 @router.get("/vector-db/collections")
 def get_collections():
     """Fetch all collections with per-collection metadata from Qdrant."""
-    db_type = vectordb.vectordb_type
+    state = ensure_active_vectordb_loaded()
+    db_type = state.vectordb_type or VectorDBType.QDRANT.value
     try:
         client = _qdrant_client()
         names = [col.name for col in client.get_collections().collections]
@@ -76,7 +77,7 @@ def get_collections():
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Failed to fetch collections: {exc}")
 
-    return {"vector_db": db_type.value, "collections": collections}
+    return {"vector_db": db_type, "collections": collections}
 
 
 @router.get("/vector-db/collections/{collection_name}")
@@ -107,15 +108,16 @@ def get_vectordb_providers():
 
 @router.get("/vector-db/current/")
 def get_current_vectordb():
-    if not active_vectordb.connected:
+    state = ensure_active_vectordb_loaded()
+    if not state.connected:
         raise HTTPException(status_code=404, detail="No vector DB connected yet.")
 
     return {
-        "vectordb_type": active_vectordb.vectordb_type,
-        "url": active_vectordb.url,
-        "distance_metric": active_vectordb.distance_metric,
-        "hybrid_search": active_vectordb.hybrid_search,
-        "store_meta": active_vectordb.store_meta,
+        "vectordb_type": state.vectordb_type,
+        "url": state.url,
+        "distance_metric": state.distance_metric,
+        "hybrid_search": state.hybrid_search,
+        "store_meta": state.store_meta,
     }
 
 @router.get("/vector-db/GetCurrentDB/")
@@ -131,6 +133,7 @@ def connect_vector_db(
     hybrid_search: Optional[bool] = False,
     store_meta: Optional[bool] = True,
 ):
+    ensure_active_vectordb_loaded()
     provider_key = vectordb_type.value
 
     providers = _vectordb_providers()
@@ -183,11 +186,6 @@ def connect_vector_db(
     active_vectordb.store_meta = bool(store_meta)
     active_vectordb.connected = True
     active_vectordb.save()
-
-    # Sync in-memory request model used by existing pipeline imports
-    vectordb.vectordb_type = vectordb_type
-    vectordb.url = effective_url
-    vectordb.api_key = effective_api_key
 
     return {
         "status": "connected",

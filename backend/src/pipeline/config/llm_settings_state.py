@@ -52,13 +52,13 @@ class LLMSettingsState:
     streamResponses: bool = False
     systemPrompt: str = _DEFAULT_SYSTEM_PROMPT
 
-    def save(self) -> None:
+    def save(self, user_id: int = 1) -> None:
         _ensure_tables()
         db = SessionLocal()
         try:
-            row = db.query(LLMSettingsStateModel).filter(LLMSettingsStateModel.id == 1).first()
+            row = db.query(LLMSettingsStateModel).filter(LLMSettingsStateModel.id == user_id).first()
             if row is None:
-                row = LLMSettingsStateModel(id=1, systemPrompt=_DEFAULT_SYSTEM_PROMPT)
+                row = LLMSettingsStateModel(id=user_id, systemPrompt=_DEFAULT_SYSTEM_PROMPT)
                 db.add(row)
 
             row.llmProvider = self.llmProvider
@@ -88,15 +88,15 @@ class LLMSettingsState:
                 setattr(self, key, value)
 
     @classmethod
-    def load(cls) -> "LLMSettingsState":
+    def load(cls, user_id: int = 1) -> "LLMSettingsState":
         _ensure_tables()
         db = SessionLocal()
         try:
-            row = db.query(LLMSettingsStateModel).filter(LLMSettingsStateModel.id == 1).first()
+            row = db.query(LLMSettingsStateModel).filter(LLMSettingsStateModel.id == user_id).first()
             if row is None:
                 legacy_state = _load_legacy_json()
-                if legacy_state is not None:
-                    legacy_state.save()
+                if legacy_state is not None and user_id == 1:
+                    legacy_state.save(user_id=user_id)
                     return legacy_state
                 return cls()
 
@@ -121,4 +121,31 @@ class LLMSettingsState:
             db.close()
 
 
-active_llm_settings = LLMSettingsState.load()
+_active_llm_settings_loaded = False
+active_llm_settings = LLMSettingsState()
+
+
+def ensure_active_llm_settings_loaded(user_id: int = 1) -> LLMSettingsState:
+    """Lazily load active LLM settings from DB on first use."""
+    global _active_llm_settings_loaded
+
+    if _active_llm_settings_loaded:
+        return active_llm_settings
+
+    loaded = LLMSettingsState.load(user_id=user_id)
+    active_llm_settings.llmProvider = loaded.llmProvider
+    active_llm_settings.llmModel = loaded.llmModel
+    active_llm_settings.apiKey = loaded.apiKey
+    active_llm_settings.temperature = loaded.temperature
+    active_llm_settings.maxTokens = loaded.maxTokens
+    active_llm_settings.defaultTopK = loaded.defaultTopK
+    active_llm_settings.simThreshold = loaded.simThreshold
+    active_llm_settings.reranking = loaded.reranking
+    active_llm_settings.multiQuery = loaded.multiQuery
+    active_llm_settings.compression = loaded.compression
+    active_llm_settings.showSources = loaded.showSources
+    active_llm_settings.streamResponses = loaded.streamResponses
+    active_llm_settings.systemPrompt = loaded.systemPrompt
+    _active_llm_settings_loaded = True
+
+    return active_llm_settings
